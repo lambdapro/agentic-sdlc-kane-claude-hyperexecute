@@ -189,21 +189,63 @@ jobs:
           ./hyperexecute \
             --user "$LT_USERNAME" \
             --key "$LT_ACCESS_KEY" \
-            --config hyperexecute.yaml
+            --config hyperexecute.yaml 2>&1 | tee hyperexecute-cli.log
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: reports/
+          path: |
+            reports/
+            hyperexecute-cli.log
 
       - name: Fail if HyperExecute tests failed
         if: steps.hyperexecute.outcome == 'failure'
         run: exit 1
 
+  analyze-failures:
+    name: Stage 4c - Analyze HyperExecute Failures
+    needs: execute
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: reports
+
+      - name: Move CLI log to expected location
+        run: mv reports/hyperexecute-cli.log hyperexecute-cli.log 2>/dev/null || true
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Analyze HyperExecute failures
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: python ci/analyze_hyperexecute_failures.py
+
+      - name: Print failure analysis
+        if: always()
+        run: cat reports/hyperexecute_failure_analysis.md 2>/dev/null || echo "No failure analysis generated"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: failure-analysis
+          path: reports/hyperexecute_failure_analysis.md
+
   report:
     name: Stage 5 - Traceability and Release Recommendation
-    needs: execute
+    needs: analyze-failures
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -229,6 +271,12 @@ jobs:
         if: always()
         with:
           name: test-results
+          path: reports
+
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: failure-analysis
           path: reports
 
       - name: Install Python dependencies
