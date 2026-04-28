@@ -2,34 +2,34 @@
   {
     "id": "SC-001",
     "requirement_id": "AC-001",
-    "title": "Navigate to credit cards section and view available card list",
+    "title": "Navigate to products section and view available product list",
     "steps": [
       "Navigate to https://ecommerce-playground.lambdatest.io/",
-      "Locate and click the Credit Cards navigation link",
-      "Verify the credit cards listing page loads",
-      "Verify multiple card tiles are visible on the page"
+      "Locate and click the Shop navigation link",
+      "Verify the products listing page loads",
+      "Verify multiple product tiles are visible on the page"
     ],
-    "expected_result": "A list of available American Express credit cards is displayed with card tiles and filter options visible",
+    "expected_result": "A list of available products is displayed with product tiles and filter options visible",
     "status": "updated",
-    "kane_objective": "User can navigate to the credit cards section of amex.com and view a list of available credit cards",
-    "kane_url": "https://www.americanexpress.com/",
+    "kane_objective": "User can navigate to the products section of the site and view a list of available products",
+    "kane_url": "https://ecommerce-playground.lambdatest.io/",
     "kane_last_status": "pending",
     "test_case_id": "TC-001",
     "last_verified": "2026-04-28",
-    "source_description": "User can navigate to the credit cards section of amex.com and view a list of available credit cards"
+    "source_description": "User can navigate to the products section of the site and view a list of available products"
   },
   {
     "id": "SC-002",
     "requirement_id": "AC-002",
-    "title": "Filter credit cards by category (rewards, travel, cashback)",
+    "title": "Filter products by category",
     "steps": [
       "Navigate to https://ecommerce-playground.lambdatest.io/",
-      "Go to the credit cards section",
+      "Go to a category page",
       "Locate filter chips such as Travel, Cash Back, or Rewards",
       "Click a filter chip",
       "Verify the card list updates to show filtered results"
     ],
-    "expected_result": "Filtered credit card results are displayed below the filter chips after applying a filter",
+    "expected_result": "Filtered product results are displayed after applying a filter",
     "status": "updated",
     "kane_objective": "User can use filters (e.g., rewards, travel, cashback) to refine results",
     "kane_url": "https://ecommerce-playground.lambdatest.io/",
@@ -41,34 +41,34 @@
   {
     "id": "SC-003",
     "requirement_id": "AC-003",
-    "title": "Click a credit card to view details including benefits, fees, and rewards",
+    "title": "Click a product to view details including price and description",
     "steps": [
       "Navigate to https://ecommerce-playground.lambdatest.io/",
-      "Go to the credit cards section",
-      "Click on any credit card tile or View Details link",
-      "Verify the card detail page loads",
+      "Search for a product",
+      "Click on any product tile or title",
+      "Verify the product detail page loads",
       "Verify benefits, annual fee, and rewards information is visible"
     ],
-    "expected_result": "Card detail page is displayed showing benefits, annual fee, and rewards or points information",
+    "expected_result": "Product detail page is displayed showing specific item information",
     "status": "updated",
-    "kane_objective": "User can click on a credit card to view details (benefits, fees, rewards)",
+    "kane_objective": "User can click on a product to view details",
     "kane_url": "https://ecommerce-playground.lambdatest.io/",
     "kane_last_status": "pending",
     "test_case_id": "TC-003",
     "last_verified": "2026-04-28",
-    "source_description": "User can click on a credit card to view details (benefits, fees, rewards)"
+    "source_description": "User can click on a product to view details"
   },
   {
     "id": "SC-004",
     "requirement_id": "AC-004",
-    "title": "View card highlights and comparison without logging in",
+    "title": "View product highlights without logging in",
     "steps": [
       "Navigate to https://ecommerce-playground.lambdatest.io/ without logging in",
-      "Go to the credit cards section",
-      "Verify card highlights or comparison section is visible",
+      "Scroll through the home page",
+      "Verify product highlights or featured section is visible",
       "Verify no login prompt blocks the content"
     ],
-    "expected_result": "Card highlights and featured benefits are visible on the credit cards page without requiring login",
+    "expected_result": "Product highlights are visible on the page without requiring login",
     "status": "updated",
     "kane_objective": "User can see clear card comparison or highlights without logging in",
     "kane_url": "https://ecommerce-playground.lambdatest.io/",
@@ -83,14 +83,18 @@
     "title": "Search results are relevant to selected filters or criteria",
     "steps": [
       "Navigate to https://ecommerce-playground.lambdatest.io/",
-      "Go to the credit cards section",
-      "Apply a filter such as Travel",
-      "Verify the displayed cards are relevant to the selected filter",
-      "Check that card descriptions or labels match the filter category"
+      "Search for an item",
+      "Apply a filter",
+      "Verify the displayed items are relevant to the selected filter",
+      "Check that item descriptions match the search term"
     ],
-    "expected_result": "Cards shown after applying a filter are relevant to the selected category, such as travel cards appearing when the Travel filter is applied",
+    "expected_result": "Results shown are relevant to the selected category or search term",
     "status": "updated",
     "kane_objective": "User receives relevant results based on selected filters or search criteria",
     "kane_url": "https://ecommerce-playground.lambdatest.io/",
     "kane_last_status": "pending",
- 
+    "test_case_id": "TC-005",
+    "last_verified": "2026-04-28",
+    "source_description": "User receives relevant results based on selected filters or search criteria"
+  }
+]

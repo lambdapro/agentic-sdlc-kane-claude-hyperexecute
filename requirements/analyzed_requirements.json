@@ -1,8 +1,8 @@
 [
   {
     "id": "AC-001",
-    "title": "Navigate to credit cards section and view card list",
-    "description": "User can navigate to the products section of the site and view a list of available products",
+    "title": "Navigate to products section and view product list",
+    "description": "User can navigate to the product section of the site and view a list of available products",
     "url": "https://ecommerce-playground.lambdatest.io/",
     "kane_status": "pending",
     "kane_summary": "Kane run not attempted.",
@@ -12,8 +12,8 @@
   },
   {
     "id": "AC-002",
-    "title": "Use filters to refine credit card results",
-    "description": "User can use filters (e.g., rewards, travel, cashback) to refine results",
+    "title": "Use filters to refine product results",
+    "description": "User can use filters to refine results",
     "url": "https://ecommerce-playground.lambdatest.io/",
     "kane_status": "pending",
     "kane_summary": "Kane run not attempted.",
@@ -23,8 +23,8 @@
   },
   {
     "id": "AC-003",
-    "title": "Click a credit card to view details including benefits fees and rewards",
-    "description": "User can click on a credit card to view details (benefits, fees, rewards)",
+    "title": "Click a product to view details including price and description",
+    "description": "User can click on a product to view details",
     "url": "https://ecommerce-playground.lambdatest.io/",
     "kane_status": "pending",
     "kane_summary": "Kane run not attempted.",
@@ -34,8 +34,8 @@
   },
   {
     "id": "AC-004",
-    "title": "View card highlights and comparison without logging in",
-    "description": "User can see clear card comparison or highlights without logging in",
+    "title": "View product highlights without logging in",
+    "description": "User can see product highlights without logging in",
     "url": "https://ecommerce-playground.lambdatest.io/",
     "kane_status": "pending",
     "kane_summary": "Kane run not attempted.",
