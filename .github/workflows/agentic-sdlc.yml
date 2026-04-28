@@ -275,6 +275,18 @@ jobs:
       - uses: actions/download-artifact@v4
         if: always()
         with:
+          name: generated-assets
+          path: .
+
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: selection
+          path: reports
+
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
           name: test-results
           path: reports
 
@@ -293,17 +305,23 @@ jobs:
       - name: Generate release recommendation
         run: python ci/release_recommendation.py
 
-      - name: Print release recommendation
+      - name: Build full pipeline summary
         if: always()
         run: |
-          RELEASE=$(cat reports/release_recommendation.md 2>/dev/null || echo "Release report not generated")
-          FAILURE=$(cat reports/hyperexecute_failure_analysis.md 2>/dev/null || echo "Failure analysis not generated")
-          echo "$RELEASE"
-          echo ""
-          echo "$FAILURE"
-          echo "$RELEASE" >> $GITHUB_STEP_SUMMARY
+          RUN_URL="${{ env.RUN_URL }}"
+          echo "# Agentic SDLC Pipeline — Full Run Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "$FAILURE" >> $GITHUB_STEP_SUMMARY
+          echo "> Run: $RUN_URL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          python ci/write_github_summary.py --stage analyze   --run-url "$RUN_URL"
+          python ci/write_github_summary.py --stage manage    --run-url "$RUN_URL"
+          python ci/write_github_summary.py --stage generate  --run-url "$RUN_URL"
+          python ci/write_github_summary.py --stage select    --run-url "$RUN_URL"
+          python ci/write_github_summary.py --stage execute   --run-url "$RUN_URL"
+          python ci/write_github_summary.py --stage analyze-failures --run-url "$RUN_URL"
+          python ci/write_github_summary.py --stage report    --run-url "$RUN_URL"
 
       - uses: actions/upload-artifact@v4
         if: always()
