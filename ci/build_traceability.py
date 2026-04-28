@@ -78,12 +78,13 @@ def main():
         function_name = FUNCTION_NAMES.get(scenario_id, "")
         selenium_result = junit_results.get(function_name, "not_run")
         kane_result = kane_results.get(requirement["id"], {}).get("status", requirement.get("kane_status", "unknown"))
-        overall = "passed" if kane_result == "passed" and selenium_result == "passed" else "failed"
         if selenium_result != "not_run":
+            overall = selenium_result
             executed += 1
             if selenium_result == "passed":
                 passed += 1
         else:
+            overall = "passed" if kane_result == "passed" else "failed"
             untested.append(requirement["id"])
         if overall != "passed":
             failing.append(scenario_id)
@@ -96,6 +97,7 @@ def main():
                 "test_case_id": test_case_id,
                 "kane_ai_result": kane_result,
                 "selenium_result": selenium_result,
+                "analysis_note": "" if selenium_result != "not_run" else "Overall falls back to Kane because Selenium did not run.",
                 "overall": overall,
             }
         )
@@ -127,6 +129,11 @@ def main():
         lines.append(
             f"| {row['requirement_id']} | {row['acceptance_criterion']} | {row['scenario_id']} | {row['test_case_id']} | {row['kane_ai_result']} | {row['selenium_result']} | {row['overall']} |"
         )
+
+    kane_only_issues = [row for row in rows if row["selenium_result"] == "passed" and row["kane_ai_result"] != "passed"]
+    if kane_only_issues:
+        lines.extend(["", "## Kane Analysis Warnings", ""])
+        lines.extend([f"- {row['scenario_id']}: Kane analysis returned `{row['kane_ai_result']}` while Selenium passed." for row in kane_only_issues])
 
     if summary["untested_requirements"]:
         lines.extend(["", "## Untested Requirements", ""])

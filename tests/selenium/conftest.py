@@ -10,6 +10,7 @@ LAMBDATEST_GRID = f"https://{LT_USERNAME}:{LT_ACCESS_KEY}@hub.lambdatest.com/wd/
 USE_REMOTE = os.environ.get("USE_REMOTE_GRID", "").lower() in {"1", "true", "yes"}
 if not os.environ.get("USE_REMOTE_GRID"):
     USE_REMOTE = bool(LT_USERNAME and LT_ACCESS_KEY)
+HEADLESS = os.environ.get("HEADLESS", "true").lower() in {"1", "true", "yes"}
 
 
 def pytest_configure(config):
@@ -44,7 +45,8 @@ def driver(request):
         )
     else:
         opts = Options()
-        opts.add_argument("--headless")
+        if HEADLESS:
+            opts.add_argument("--headless")
         opts.add_argument("--no-sandbox")
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--window-size=1440,2200")

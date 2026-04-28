@@ -1,4 +1,5 @@
 import argparse
+import re
 import json
 import os
 import subprocess
@@ -62,6 +63,23 @@ def make_title(description):
     return " ".join(words[:10]).strip().capitalize()
 
 
+def make_kane_objective(description):
+    return (
+        f"Open {AMEX_URL}. "
+        f"Then verify this acceptance criterion on the live site: {description}. "
+        "Use plain-English validation and finish with a clear pass or fail outcome."
+    )
+
+
+def parse_last_json_line(lines):
+    for line in reversed(lines):
+        try:
+            return json.loads(line)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 def run_kane(description):
     username = os.environ.get("LT_USERNAME", "")
     access_key = os.environ.get("LT_ACCESS_KEY", "")
@@ -78,9 +96,7 @@ def run_kane(description):
         "-y",
         "@testmuai/kane-cli@latest",
         "run",
-        description,
-        "--url",
-        AMEX_URL,
+        make_kane_objective(description),
         "--username",
         username,
         "--access-key",
@@ -93,6 +109,10 @@ def run_kane(description):
         "15",
     ]
     completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    combined_output = "\n".join(
+        part for part in [completed.stdout.strip(), completed.stderr.strip()] if part
+    )
+    links = re.findall(r"https?://\S+", combined_output)
     lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
     if not lines:
         stderr = completed.stderr.strip() or "Kane CLI did not emit a parseable result."
@@ -101,16 +121,17 @@ def run_kane(description):
             "summary": stderr,
             "final_state": {},
             "duration": None,
+            "links": links,
         }
 
-    try:
-        payload = json.loads(lines[-1])
-    except json.JSONDecodeError:
+    payload = parse_last_json_line(lines)
+    if payload is None:
         return {
             "status": "failed",
-            "summary": lines[-1],
+            "summary": combined_output or lines[-1],
             "final_state": {},
             "duration": None,
+            "links": links,
         }
 
     return {
@@ -118,6 +139,7 @@ def run_kane(description):
         "summary": payload.get("one_liner", ""),
         "final_state": payload.get("final_state", {}),
         "duration": payload.get("duration"),
+        "links": links,
     }
 
 
@@ -135,6 +157,7 @@ def main():
             "summary": "Kane run not attempted.",
             "final_state": {},
             "duration": None,
+            "links": [],
         }
         if not args.skip_kane:
             kane = run_kane(description)
@@ -148,6 +171,7 @@ def main():
             "kane_summary": kane["summary"],
             "kane_final_state": kane["final_state"],
             "kane_duration": kane["duration"],
+            "kane_links": kane["links"],
             "last_analyzed": today,
         }
         analyzed.append(item)
@@ -160,6 +184,7 @@ def main():
                 "final_state": item["kane_final_state"],
                 "duration": item["kane_duration"],
                 "url": item["url"],
+                "links": item["kane_links"],
             }
         )
 

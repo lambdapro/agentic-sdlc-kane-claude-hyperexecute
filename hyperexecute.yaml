@@ -6,6 +6,7 @@ concurrency: 4
 env:
   TARGET_URL: https://www.americanexpress.com/
   USE_REMOTE_GRID: "false"
+  HEADLESS: "false"
 
 runtime:
   language: python
