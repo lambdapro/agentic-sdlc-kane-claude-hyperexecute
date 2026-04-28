@@ -7,7 +7,9 @@ from selenium.webdriver.chrome.options import Options
 LT_USERNAME = os.environ.get("LT_USERNAME", "")
 LT_ACCESS_KEY = os.environ.get("LT_ACCESS_KEY", "")
 LAMBDATEST_GRID = f"https://{LT_USERNAME}:{LT_ACCESS_KEY}@hub.lambdatest.com/wd/hub"
-USE_REMOTE = bool(LT_USERNAME and LT_ACCESS_KEY)
+USE_REMOTE = os.environ.get("USE_REMOTE_GRID", "").lower() in {"1", "true", "yes"}
+if not os.environ.get("USE_REMOTE_GRID"):
+    USE_REMOTE = bool(LT_USERNAME and LT_ACCESS_KEY)
 
 
 def pytest_configure(config):

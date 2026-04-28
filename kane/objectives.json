@@ -51,7 +51,7 @@
     "url": "https://www.americanexpress.com/",
     "timeout": 120,
     "max_steps": 15,
-    "last_run_status": "not_run",
-    "last_run_date": null
+    "last_run_status": "pending",
+    "last_run_date": "2026-04-28"
   }
 ]

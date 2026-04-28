@@ -35,6 +35,11 @@ The entire pipeline is controlled by **`PIPELINE.md`** — a plain-English instr
 claude -p "Execute stage: <STAGE_NAME> from PIPELINE.md"
 ```
 
+This repo now supports two execution styles:
+
+- Agentic mode: Claude Code executes each stage from `PIPELINE.md`.
+- Pure CI mode: the `Pure CI Variant (No Claude Code)` section in `PIPELINE.md` provides job-ready snippets for each stage.
+
 ---
 
 ## Repository Structure
@@ -306,6 +311,9 @@ done
 
 The pipeline triggers automatically when any file in `requirements/` is changed.
 
+The checked-in workflow at `.github/workflows/agentic-sdlc.yml` is the Claude-driven variant.
+If you want GitHub Actions without Claude Code, use the `Pure CI Variant (No Claude Code)` section in `PIPELINE.md` as the blueprint for separate `analyze`, `manage`, `generate`, `select`, `execute`, and `report` jobs.
+
 ### Required secrets — Settings → Secrets and variables → Actions
 
 | Secret | Description |
@@ -313,6 +321,8 @@ The pipeline triggers automatically when any file in `requirements/` is changed.
 | `LT_USERNAME` | LambdaTest username |
 | `LT_ACCESS_KEY` | LambdaTest access key |
 | `ANTHROPIC_API_KEY` | Anthropic API key for Claude Code |
+
+For the Pure CI variant, only `LT_USERNAME` and `LT_ACCESS_KEY` are required unless you keep any Claude-driven stages.
 
 ### Trigger the pipeline by pushing a requirement change
 
@@ -330,6 +340,22 @@ This triggers the full 5-stage pipeline automatically.
 ### Manual trigger — run all tests
 
 Go to **Actions → Agentic SDLC Pipeline → Run workflow**, check **"Run all tests"**, and click **Run workflow**. This includes all active scenarios, not just changed ones.
+
+---
+
+### Pure CI variant on GitHub Actions
+
+Use the snippets in `PIPELINE.md` to split the workflow into these jobs:
+
+1. `analyze`
+2. `manage`
+3. `generate`
+4. `select`
+5. `execute`
+6. `report`
+
+The current repository does not yet include the helper scripts referenced by the Pure CI examples, such as `ci/generate_tests_from_scenarios.py`, `ci/build_traceability.py`, and `ci/release_recommendation.py`.
+That means the new section is ready as a GitHub Actions design and copy/paste starting point, while `.github/workflows/agentic-sdlc.yml` remains the runnable workflow that is checked in today.
 
 ---
 

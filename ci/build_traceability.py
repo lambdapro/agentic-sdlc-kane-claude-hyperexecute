@@ -1,0 +1,145 @@
+import argparse
+import json
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--requirements", default="requirements/analyzed_requirements.json")
+    parser.add_argument("--scenarios", default="scenarios/scenarios.json")
+    parser.add_argument("--manifest", default="reports/test_execution_manifest.json")
+    parser.add_argument("--pytest-junit", default="reports/junit.xml")
+    parser.add_argument("--kane-results", default="reports/kane_results.json")
+    parser.add_argument("--out", default="reports/traceability_matrix.md")
+    parser.add_argument("--json-out", default="reports/traceability_matrix.json")
+    return parser.parse_args()
+
+
+FUNCTION_NAMES = {
+    "SC-001": "test_sc_001_navigate_to_credit_cards_and_view_list",
+    "SC-002": "test_sc_002_filter_cards_by_category",
+    "SC-003": "test_sc_003_click_card_view_details",
+    "SC-004": "test_sc_004_card_highlights_visible_without_login",
+    "SC-005": "test_sc_005_relevant_results_for_selected_filter",
+}
+
+
+def load_json(path, default):
+    file_path = Path(path)
+    if not file_path.exists():
+        return default
+    return json.loads(file_path.read_text(encoding="utf-8"))
+
+
+def load_junit_results(path):
+    file_path = Path(path)
+    if not file_path.exists():
+        return {}
+    root = ET.fromstring(file_path.read_text(encoding="utf-8"))
+    results = {}
+    for testcase in root.iter("testcase"):
+        name = testcase.attrib.get("name", "")
+        result = "passed"
+        if testcase.find("failure") is not None or testcase.find("error") is not None:
+            result = "failed"
+        elif testcase.find("skipped") is not None:
+            result = "skipped"
+        results[name] = result
+    return results
+
+
+def main():
+    args = parse_args()
+    requirements = load_json(args.requirements, [])
+    scenarios = load_json(args.scenarios, [])
+    manifest = load_json(args.manifest, {})
+    kane_results = {
+        item["requirement_id"]: item for item in load_json(args.kane_results, [])
+    }
+    junit_results = load_junit_results(args.pytest_junit)
+    scenarios_by_requirement = {scenario["requirement_id"]: scenario for scenario in scenarios}
+
+    rows = []
+    executed = 0
+    passed = 0
+    untested = []
+    failing = []
+
+    for requirement in requirements:
+        scenario = scenarios_by_requirement.get(requirement["id"])
+        test_case_id = scenario.get("test_case_id") if scenario else "n/a"
+        scenario_id = scenario.get("id") if scenario else "n/a"
+        function_name = FUNCTION_NAMES.get(scenario_id, "")
+        selenium_result = junit_results.get(function_name, "not_run")
+        kane_result = kane_results.get(requirement["id"], {}).get("status", requirement.get("kane_status", "unknown"))
+        overall = "passed" if kane_result == "passed" and selenium_result == "passed" else "failed"
+        if selenium_result != "not_run":
+            executed += 1
+            if selenium_result == "passed":
+                passed += 1
+        else:
+            untested.append(requirement["id"])
+        if overall != "passed":
+            failing.append(scenario_id)
+
+        rows.append(
+            {
+                "requirement_id": requirement["id"],
+                "acceptance_criterion": requirement["description"],
+                "scenario_id": scenario_id,
+                "test_case_id": test_case_id,
+                "kane_ai_result": kane_result,
+                "selenium_result": selenium_result,
+                "overall": overall,
+            }
+        )
+
+    pass_rate = round((passed / executed) * 100, 1) if executed else 0.0
+    summary = {
+        "run_type": manifest.get("run_type", "unknown"),
+        "requirements_covered": len([row for row in rows if row["scenario_id"] != "n/a"]),
+        "requirements_total": len(requirements),
+        "executed": executed,
+        "passed": passed,
+        "pass_rate": pass_rate,
+        "untested_requirements": untested,
+        "failing_scenarios": [scenario_id for scenario_id in failing if scenario_id != "n/a"],
+    }
+
+    lines = [
+        "# Traceability Matrix",
+        "",
+        f"- Run type: {summary['run_type']}",
+        f"- Requirements covered: {summary['requirements_covered']}/{summary['requirements_total']}",
+        f"- Selenium pass rate: {summary['pass_rate']}% ({summary['passed']} passed, {summary['executed'] - summary['passed']} failed or skipped)",
+        "",
+        "| Requirement ID | Acceptance Criterion | Scenario ID | Test Case ID | Kane AI Result | Selenium Result | Overall |",
+        "|---|---|---|---|---|---|---|",
+    ]
+
+    for row in rows:
+        lines.append(
+            f"| {row['requirement_id']} | {row['acceptance_criterion']} | {row['scenario_id']} | {row['test_case_id']} | {row['kane_ai_result']} | {row['selenium_result']} | {row['overall']} |"
+        )
+
+    if summary["untested_requirements"]:
+        lines.extend(["", "## Untested Requirements", ""])
+        lines.extend([f"- {item}" for item in summary["untested_requirements"]])
+
+    if summary["failing_scenarios"]:
+        lines.extend(["", "## Failing Scenarios", ""])
+        lines.extend([f"- {item}" for item in summary["failing_scenarios"]])
+
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    json_path = Path(args.json_out)
+    json_path.write_text(json.dumps({"summary": summary, "rows": rows}, indent=2) + "\n", encoding="utf-8")
+
+    print(f"traceability_rows={len(rows)} pass_rate={pass_rate}")
+
+
+if __name__ == "__main__":
+    main()
