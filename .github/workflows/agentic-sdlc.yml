@@ -8,7 +8,6 @@ on:
       - "tests/**"
       - "ci/**"
       - "hyperexecute.yaml"
-      - ".hyperexecuteignore"
       - ".github/workflows/agentic-sdlc.yml"
   pull_request:
     paths:
@@ -17,7 +16,6 @@ on:
       - "tests/**"
       - "ci/**"
       - "hyperexecute.yaml"
-      - ".hyperexecuteignore"
       - ".github/workflows/agentic-sdlc.yml"
   workflow_dispatch:
     inputs:
@@ -29,11 +27,11 @@ on:
 env:
   NODE_VERSION: "22"
   PYTHON_VERSION: "3.11"
-  RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
+
   analyze:
-    name: Analyze Requirements
+    name: Stage 1 - Analyze Requirements
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,26 +47,23 @@ jobs:
       - name: Install Kane CLI
         run: npm install -g @testmuai/kane-cli
 
-      - name: Run pure CI analyze stage
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run analyze stage
         env:
           LT_USERNAME: ${{ secrets.LT_USERNAME }}
           LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
         run: python ci/analyze_requirements.py
 
-      - name: Write analyze summary
-        if: always()
-        run: python ci/write_github_summary.py --stage analyze --run-url "${{ env.RUN_URL }}"
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: analyzed-requirements
-          path: |
-            requirements/analyzed_requirements.json
-            reports/kane_results.json
+          path: requirements/analyzed_requirements.json
 
   manage:
-    name: Manage Scenarios
+    name: Stage 2 - Manage Scenarios
     needs: analyze
     runs-on: ubuntu-latest
     steps:
@@ -81,14 +76,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: analyzed-requirements
-          path: .
+          path: requirements
 
-      - name: Run pure CI manage stage
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run manage stage
         run: python ci/manage_scenarios.py
-
-      - name: Write manage summary
-        if: always()
-        run: python ci/write_github_summary.py --stage manage --run-url "${{ env.RUN_URL }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -96,7 +90,7 @@ jobs:
           path: scenarios/scenarios.json
 
   generate:
-    name: Generate Tests
+    name: Stage 3 - Generate Tests
     needs: manage
     runs-on: ubuntu-latest
     steps:
@@ -111,23 +105,22 @@ jobs:
           name: managed-scenarios
           path: scenarios
 
-      - name: Run pure CI generate stage
-        run: python ci/generate_tests_from_scenarios.py
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
 
-      - name: Write generate summary
-        if: always()
-        run: python ci/write_github_summary.py --stage generate --run-url "${{ env.RUN_URL }}"
+      - name: Run generate stage
+        run: python ci/generate_tests_from_scenarios.py
 
       - uses: actions/upload-artifact@v4
         with:
           name: generated-assets
           path: |
-            tests/selenium/test_credit_cards.py
+            tests/
             kane/objectives.json
             scenarios/scenarios.json
 
   select:
-    name: Select Tests
+    name: Stage 4a - Select Tests
     needs: generate
     runs-on: ubuntu-latest
     steps:
@@ -142,14 +135,13 @@ jobs:
           name: managed-scenarios
           path: scenarios
 
-      - name: Run pure CI select stage
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run select stage
         env:
           FULL_RUN: ${{ inputs.full_run || 'true' }}
         run: python ci/select_tests.py
-
-      - name: Write select summary
-        if: always()
-        run: python ci/write_github_summary.py --stage select --run-url "${{ env.RUN_URL }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -159,7 +151,7 @@ jobs:
             reports/pytest_selection.txt
 
   execute:
-    name: Execute Selenium On HyperExecute
+    name: Stage 4b - Execute on HyperExecute
     needs: select
     runs-on: ubuntu-latest
     steps:
@@ -179,12 +171,15 @@ jobs:
           name: selection
           path: reports
 
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
       - name: Download HyperExecute CLI
         run: |
           curl -O https://downloads.lambdatest.com/hyperexecute/linux/hyperexecute
           chmod +x hyperexecute
 
-      - name: Run selected tests on HyperExecute
+      - name: Run tests on HyperExecute
         id: hyperexecute
         continue-on-error: true
         env:
@@ -194,38 +189,20 @@ jobs:
           ./hyperexecute \
             --user "$LT_USERNAME" \
             --key "$LT_ACCESS_KEY" \
-            --config hyperexecute.yaml \
-            --download-artifacts \
-            --download-artifacts-path reports/hyperexecute-artifacts \
-            --download-report \
-            --download-logs
-
-      - name: Surface HyperExecute result metadata
-        if: always()
-        run: |
-          if [ -f .hyperexecute/result.json ]; then
-            cp .hyperexecute/result.json reports/hyperexecute-result.json
-          fi
-          find . -name result.json -print
+            --config hyperexecute.yaml
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: |
-            reports/
-            hyperexecute-cli.log
+          path: reports/
 
-      - name: Fail job if HyperExecute reported test failures
+      - name: Fail if HyperExecute tests failed
         if: steps.hyperexecute.outcome == 'failure'
         run: exit 1
 
-      - name: Write execute summary
-        if: always()
-        run: python ci/write_github_summary.py --stage execute --run-url "${{ env.RUN_URL }}"
-
-  analyze-failures:
-    name: Analyze HyperExecute Failures
+  report:
+    name: Stage 5 - Traceability and Release Recommendation
     needs: execute
     if: always()
     runs-on: ubuntu-latest
@@ -239,7 +216,38 @@ jobs:
       - uses: actions/download-artifact@v4
         if: always()
         with:
-          name: test-results
-          path: .
+          name: analyzed-requirements
+          path: requirements
 
-      - name: Build Hype
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: managed-scenarios
+          path: scenarios
+
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: reports
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build traceability matrix
+        run: python ci/build_traceability.py
+
+      - name: Generate release recommendation
+        run: python ci/release_recommendation.py
+
+      - name: Print release recommendation
+        if: always()
+        run: cat reports/release_recommendation.md 2>/dev/null || echo "Report not generated"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-reports
+          path: |
+            reports/traceability_matrix.md
+            reports/release_recommendation.md
