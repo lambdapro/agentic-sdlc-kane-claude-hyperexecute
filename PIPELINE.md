@@ -11,24 +11,50 @@ using the tools available (file read/write, kane-cli, bash commands).
 
 ## Stage: ANALYZE_REQUIREMENTS
 
-**Goal:** Parse requirements and confirm each acceptance criterion is observable on the live site.
+**Goal:** Parse requirements and confirm each acceptance criterion is observable on the live site using the Kane CLI skill for AI agents.
 
-Instructions:
+### Kane CLI Skill Setup (run once per CI job)
+
+The Kane CLI skill teaches this agent how to invoke kane-cli, parse NDJSON output, and present structured results. Install it before running any verification:
+
+```bash
+# Install the Kane CLI skill for Claude Code (AI agent mode)
+mkdir -p ~/.claude/skills/kane-cli
+curl -fsSL -o ~/.claude/skills/kane-cli/SKILL.md \
+  https://raw.githubusercontent.com/LambdaTest/kane-cli/main/skills/claude/SKILL.md
+
+# Authenticate with Basic Auth (OAuth requires a browser — incompatible with CI)
+kane-cli login \
+  --username "$LT_USERNAME" \
+  --access-key "$LT_ACCESS_KEY"
+
+# Verify authentication
+kane-cli whoami
+```
+
+The skill file is a plain markdown file. Review it at `~/.claude/skills/kane-cli/SKILL.md`.
+Skills work on top of Agent Mode (`--agent` flag) — the skill tells this agent to always use
+`--agent`, parse the NDJSON stream, and extract structured results from the `run_end` event.
+
+### Instructions
+
 1. Read all files inside `requirements/` directory
 2. Extract every acceptance criterion as a structured item with fields:
    - id: sequential (AC-001, AC-002, ...)
    - title: short label
    - description: full acceptance criterion text
    - url: https://ecommerce-playground.lambdatest.io/
-3. For each acceptance criterion, run a kane-cli verification:
+3. For each acceptance criterion, run a Kane CLI verification using the installed skill.
+   The skill handles command construction, NDJSON parsing, and failure diagnosis automatically:
+   ```bash
+   kane-cli run "<criterion as plain-English objective>" \
+     --url https://ecommerce-playground.lambdatest.io/ \
+     --agent --headless --timeout 120
    ```
-   kane-cli run "<criterion as objective>" --url https://ecommerce-playground.lambdatest.io/ \
-     --username $LT_USERNAME --access-key $LT_ACCESS_KEY \
-     --agent --headless --timeout 120 --max-steps 15
-   ```
-4. Parse the run_end event (last line of stdout) for each kane run:
-   - Record status (passed/failed), one_liner, final_state, duration, link
-5. Write output to `requirements/analyzed_requirements.json` with schema:
+   - Credentials come from the pre-authenticated session (`kane-cli login` above)
+   - Parse only the last line of stdout (the `run_end` event)
+   - The skill extracts: status, one_liner, final_state, duration, link (Kane AI session URL)
+4. Write output to `requirements/analyzed_requirements.json`:
    ```json
    [
      {
@@ -39,12 +65,12 @@ Instructions:
        "kane_status": "passed|failed",
        "kane_summary": "...",
        "kane_final_state": {},
-       "kane_links": ["https://testmu.lambdatest.com/ai/session/..."],
+       "kane_links": ["https://kaneai.lambdatest.com/..."],
        "last_analyzed": "<ISO date>"
      }
    ]
    ```
-6. Print a summary table: requirement ID, title, Kane status, Kane Link
+5. Print a summary table: requirement ID, Kane status, Kane session link
 
 ---
 
@@ -70,8 +96,8 @@ Instructions:
      "title": "<short descriptive title>",
      "steps": [
        "Navigate to ecommerce-playground.lambdatest.io",
-       "Click on credit cards navigation link",
-       "Verify card listing section appears with multiple tiles"
+      "Click on Products navigation link",
+      "Verify product listing section appears with multiple tiles"
      ],
      "expected_result": "<what success looks like>",
      "status": "new|active|updated|deprecated",
@@ -93,7 +119,7 @@ Instructions:
 Instructions:
 1. Load `scenarios/scenarios.json`
 2. Filter scenarios where `status` is "new" or "updated"
-3. Load existing `tests/selenium/test_credit_cards.py` if it exists
+3. Load existing `tests/selenium/test_products.py` if it exists
 4. For each new/updated scenario:
    a. Check if a test function named `test_<scenario_id_lowercase>` already exists in the file
    b. If exists: update the test body to match the new scenario steps and expected_result
@@ -101,7 +127,7 @@ Instructions:
 5. Each test function must:
    - Be decorated with `@pytest.mark.scenario("<scenario_id>")` and `@pytest.mark.requirement("<requirement_id>")`
    - Use the `driver` fixture from conftest.py
-   - Use the `CreditCardsPage` page object from `tests/selenium/pages/credit_cards_page.py`
+   - Use the `ProductsPage` page object from `tests/selenium/pages/products_page.py`
    - Assert the expected_result condition
    - Have a docstring matching the scenario title
 6. Also update `kane/objectives.json` — add/update entries for new/updated scenarios
@@ -132,7 +158,7 @@ Instructions:
      "generated_at": "<ISO datetime>"
    }
    ```
-5. Write `reports/pytest_selection.txt` — one test node ID per line (e.g. `tests/selenium/test_credit_cards.py::test_sc_001`)
+5. Write `reports/pytest_selection.txt` — one test node ID per line (e.g. `tests/selenium/test_products.py::test_sc_001`)
 6. Print the selection summary
 
 ---
@@ -266,7 +292,7 @@ PY
 Use a generator script to write/update `tests/selenium/test_credit_cards.py` and `kane/objectives.json`. Example:
 
 ```bash
-python3 ci/generate_tests_from_scenarios.py --scenarios scenarios/scenarios.json --out tests/selenium/test_credit_cards.py
+python3 ci/generate_tests_from_scenarios.py --scenarios scenarios/scenarios.json --out tests/selenium/test_products.py
 ```
 
 ### SELECT_TESTS (CI)

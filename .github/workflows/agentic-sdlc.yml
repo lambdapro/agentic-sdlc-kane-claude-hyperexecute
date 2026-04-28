@@ -47,6 +47,24 @@ jobs:
       - name: Install Kane CLI
         run: npm install -g @testmuai/kane-cli
 
+      - name: Install Kane CLI skill for AI agents
+        run: |
+          mkdir -p ~/.claude/skills/kane-cli
+          curl -fsSL -o ~/.claude/skills/kane-cli/SKILL.md \
+            https://raw.githubusercontent.com/LambdaTest/kane-cli/main/skills/claude/SKILL.md
+          echo "Kane CLI skill installed:"
+          head -5 ~/.claude/skills/kane-cli/SKILL.md
+
+      - name: Authenticate Kane CLI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: |
+          kane-cli login \
+            --username "$LT_USERNAME" \
+            --access-key "$LT_ACCESS_KEY"
+          kane-cli whoami
+
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
