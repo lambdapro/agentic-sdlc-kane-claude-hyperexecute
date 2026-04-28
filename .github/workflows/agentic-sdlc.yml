@@ -23,9 +23,9 @@ on:
   workflow_dispatch:
     inputs:
       full_run:
-        description: 'Run all tests (not just changed scenarios)'
-        type: boolean
-        default: false
+        description: Run all tests (not just changed scenarios)
+        required: false
+        default: 'false'
 
 env:
   NODE_VERSION: '20'
