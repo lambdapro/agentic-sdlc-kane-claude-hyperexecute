@@ -1,0 +1,13 @@
+Title: Browse and search for available credit cards
+
+As a potential customer
+I want to search and explore credit cards on amex.com
+So that I can find a card that suits my needs
+
+Acceptance Criteria:
+User can navigate to the credit cards section of amex.com
+User can view a list of available credit cards
+User can use filters (e.g., rewards, travel, cashback) to refine results
+User can click on a credit card to view details (benefits, fees, rewards)
+User can see clear card comparison or highlights without logging in
+User receives relevant results based on selected filters or search criteria

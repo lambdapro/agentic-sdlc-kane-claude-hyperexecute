@@ -1,0 +1,223 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Agentic SDLC Pipeline — AmEx Credit Cards
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Each job calls Claude Code with a stage name from PIPELINE.md.
+# The same claude -p "Execute stage: X from PIPELINE.md" command works in:
+#   GitLab CI  →  script: claude -p "Execute stage: X from PIPELINE.md"
+#   Jenkins    →  sh 'claude -p "Execute stage: X from PIPELINE.md"'
+#   Bitbucket  →  script: claude -p "Execute stage: X from PIPELINE.md"
+#
+# Required secrets: LT_USERNAME, LT_ACCESS_KEY, ANTHROPIC_API_KEY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: Agentic SDLC Pipeline
+
+on:
+  push:
+    paths:
+      - 'requirements/**'
+  pull_request:
+    paths:
+      - 'requirements/**'
+  workflow_dispatch:
+    inputs:
+      full_run:
+        description: 'Run all tests (not just changed scenarios)'
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+# ── Stage 1: ANALYZE_REQUIREMENTS ─────────────────────────────────────────────
+jobs:
+  analyze-requirements:
+    name: "Stage 1 — Analyze Requirements"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Kane CLI + Claude Code
+        run: npm install -g @testmuai/kane-cli @anthropic-ai/claude-code
+
+      - name: "PIPELINE STAGE: ANALYZE_REQUIREMENTS"
+        run: claude -p "Execute stage: ANALYZE_REQUIREMENTS from PIPELINE.md"
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: analyzed-requirements
+          path: requirements/analyzed_requirements.json
+
+# ── Stage 2: MANAGE_SCENARIOS ─────────────────────────────────────────────────
+  manage-scenarios:
+    name: "Stage 2 — Manage Scenarios"
+    needs: analyze-requirements
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: analyzed-requirements
+          path: requirements/
+
+      - name: "PIPELINE STAGE: MANAGE_SCENARIOS"
+        run: claude -p "Execute stage: MANAGE_SCENARIOS from PIPELINE.md"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scenarios
+          path: scenarios/scenarios.json
+
+# ── Stage 3: GENERATE_TESTS ───────────────────────────────────────────────────
+  generate-tests:
+    name: "Stage 3 — Generate Tests"
+    needs: manage-scenarios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: scenarios
+          path: scenarios/
+
+      - name: "PIPELINE STAGE: GENERATE_TESTS"
+        run: claude -p "Execute stage: GENERATE_TESTS from PIPELINE.md"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-suite
+          path: |
+            tests/
+            kane/objectives.json
+
+# ── Stage 4: SELECT_TESTS + Execute on HyperExecute ──────────────────────────
+  execute-tests:
+    name: "Stage 4 — Select & Execute Tests (HyperExecute)"
+    needs: generate-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-suite
+          path: .
+
+      - name: "PIPELINE STAGE: SELECT_TESTS"
+        run: claude -p "Execute stage: SELECT_TESTS from PIPELINE.md"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FULL_RUN: ${{ inputs.full_run || 'false' }}
+
+      - name: Download HyperExecute CLI
+        run: |
+          curl -O https://downloads.lambdatest.com/hyperexecute/linux/hyperexecute
+          chmod +x hyperexecute
+
+      - name: Execute tests on HyperExecute
+        run: |
+          ./hyperexecute \
+            --user $LT_USERNAME \
+            --key $LT_ACCESS_KEY \
+            --config hyperexecute.yaml
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: reports/
+
+# ── Stage 5: TRACEABILITY_REPORT + RELEASE_RECOMMENDATION ────────────────────
+  traceability-and-recommendation:
+    name: "Stage 5 — Traceability Matrix & Release Recommendation"
+    needs: execute-tests
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: analyzed-requirements
+          path: requirements/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: scenarios
+          path: scenarios/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: reports/
+
+      - name: "PIPELINE STAGE: TRACEABILITY_REPORT"
+        run: claude -p "Execute stage: TRACEABILITY_REPORT from PIPELINE.md"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: "PIPELINE STAGE: RELEASE_RECOMMENDATION"
+        run: claude -p "Execute stage: RELEASE_RECOMMENDATION from PIPELINE.md"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-reports
+          path: |
+            reports/traceability_matrix.md
+            reports/release_recommendation.md
+
+      - name: Print release recommendation
+        run: cat reports/release_recommendation.md

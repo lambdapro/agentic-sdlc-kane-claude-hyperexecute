@@ -1,0 +1,70 @@
+version: 0.1
+runson: linux
+
+# ── Execution mode: AutoSplit ─────────────────────────────────────────────────
+# HyperExecute AI distributes tests intelligently across VMs
+autosplit: true
+concurrency: 4
+
+# ── Environment ───────────────────────────────────────────────────────────────
+env:
+  LT_USERNAME: ${LT_USERNAME}
+  LT_ACCESS_KEY: ${LT_ACCESS_KEY}
+  TARGET_URL: https://www.americanexpress.com/
+
+# ── Runtime ───────────────────────────────────────────────────────────────────
+runtime:
+  language: python
+  version: "3.11"
+
+# ── Dependency caching ────────────────────────────────────────────────────────
+cacheKey: "{{ checksum \"requirements.txt\" }}"
+cacheDirectories:
+  - .pip_cache
+
+# ── Pre-test setup ────────────────────────────────────────────────────────────
+pre:
+  - pip install --cache-dir .pip_cache -r requirements.txt
+
+# ── Test discovery ────────────────────────────────────────────────────────────
+testDiscovery:
+  type: raw
+  mode: static
+  command: grep -rn "^def test_" tests/selenium/test_credit_cards.py | awk -F: '{print "tests/selenium/test_credit_cards.py::" $3}' | awk '{print $1}' | sed 's/(driver)//'
+
+# ── Test execution ────────────────────────────────────────────────────────────
+testRunnerCommand: pytest $test -v --html=reports/$test_report.html --self-contained-html --tb=short
+
+# ── Artifacts ────────────────────────────────────────────────────────────────
+mergeArtifacts: true
+uploadArtefacts:
+  - name: selenium-test-reports
+    path: reports/
+
+# ── Retry on flakiness ────────────────────────────────────────────────────────
+retryOnFailure: true
+maxRetries: 2
+
+# ── Reporting ────────────────────────────────────────────────────────────────
+report: true
+partialReports:
+  frameworkName: pytest
+  location: reports/
+  type: html
+
+# ── Post-test: upload reports ─────────────────────────────────────────────────
+post:
+  - echo "Tests complete. Reports in reports/"
+
+# ── Timeouts ─────────────────────────────────────────────────────────────────
+globalTimeout: 60
+testSuiteTimeout: 45
+
+# ── Job metadata ─────────────────────────────────────────────────────────────
+jobLabel:
+  - amex-credit-cards
+  - agentic-sdlc
+  - selenium-python
+
+# ── Video recording ───────────────────────────────────────────────────────────
+captureScreenRecordingForScenarios: true
