@@ -1,0 +1,8 @@
+.git/
+.github/
+.hyperexecute/
+.testmu/
+screenshots/
+hyperexecute-cli.log
+reports/html/
+reports/junit/

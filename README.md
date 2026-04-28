@@ -38,7 +38,14 @@ claude -p "Execute stage: <STAGE_NAME> from PIPELINE.md"
 This repo now supports two execution styles:
 
 - Agentic mode: Claude Code executes each stage from `PIPELINE.md`.
-- Pure CI mode: the `Pure CI Variant (No Claude Code)` section in `PIPELINE.md` provides job-ready snippets for each stage.
+- Pure CI mode: GitHub Actions and helper scripts in `ci/` run the same stages without Claude.
+
+## Why Kane CLI + HyperExecute
+
+- No burning unnecessary tokens on orchestration work that CI can handle deterministically.
+- HyperExecute provides ephemeral test environments, so every execution starts clean and isolated.
+- Kane AI is a specialized testing agent, which gives requirement analysis and UI verification better accuracy.
+- HyperExecute scales parallel execution aggressively, so Selenium can fan out well beyond a single GitHub runner.
 
 ---
 
@@ -311,8 +318,9 @@ done
 
 The pipeline triggers automatically when any file in `requirements/` is changed.
 
-The checked-in workflow at `.github/workflows/agentic-sdlc.yml` is the Claude-driven variant.
-If you want GitHub Actions without Claude Code, use the `Pure CI Variant (No Claude Code)` section in `PIPELINE.md` as the blueprint for separate `analyze`, `manage`, `generate`, `select`, `execute`, and `report` jobs.
+The checked-in workflow at `.github/workflows/agentic-sdlc.yml` is now the canonical pure-CI pipeline.
+The GitHub runner handles analysis, scenario management, test generation, and test selection.
+The Selenium execution stage runs on HyperExecute, not in the runner browser, and a follow-up analysis job consumes HyperExecute logs and downloaded artifacts.
 
 ### Required secrets — Settings → Secrets and variables → Actions
 
@@ -320,9 +328,8 @@ If you want GitHub Actions without Claude Code, use the `Pure CI Variant (No Cla
 |---|---|
 | `LT_USERNAME` | LambdaTest username |
 | `LT_ACCESS_KEY` | LambdaTest access key |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude Code |
 
-For the Pure CI variant, only `LT_USERNAME` and `LT_ACCESS_KEY` are required unless you keep any Claude-driven stages.
+`ANTHROPIC_API_KEY` is not required for the GitHub Actions pipeline.
 
 ### Trigger the pipeline by pushing a requirement change
 
@@ -335,7 +342,9 @@ git commit -m "feat: update credit card browsing requirements"
 git push
 ```
 
-This triggers the full 5-stage pipeline automatically.
+This triggers the pure CI pipeline automatically.
+
+For manual execution, use the workflow named `Pure CI Pipeline` and set `full_run` to `true` when you want all active scenarios executed on HyperExecute.
 
 ### Manual trigger — run all tests
 
@@ -360,6 +369,9 @@ That means the new section is ready as a GitHub Actions design and copy/paste st
 ---
 
 ## Adapting to Other CI/CD Tools
+
+The checked-in implementation is now a single pure-CI path in `.github/workflows/agentic-sdlc.yml`.
+It runs `analyze`, `manage`, `generate`, and `select` on the GitHub runner, executes Selenium on HyperExecute, then uses downloaded HyperExecute artifacts plus JUnit output to build failure analysis and release reports.
 
 Every stage is one portable command. Copy it verbatim into any CI tool's job definition.
 

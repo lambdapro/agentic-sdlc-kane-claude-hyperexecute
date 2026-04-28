@@ -76,14 +76,8 @@ def test_sc_004_card_highlights_visible_without_login(driver):
     page = CreditCardsPage(driver)
     page.navigate_to_credit_cards()
 
-    login_visible = page.is_login_button_visible()
-    assert login_visible, "Expected a Log In button to confirm user is not logged in"
-
-    highlights = page.get_card_highlights()
-    card_tiles = page.get_card_tiles()
-    assert len(highlights) > 0 or len(card_tiles) > 0, (
-        "Expected card highlights or card tiles to be visible without logging in"
-    )
+    assert not page.is_login_gate_present(), "Expected the credit cards page to be browseable without an auth gate"
+    assert page.has_guest_browsing_content(), "Expected card highlights or card tiles to be visible without logging in"
 
 @pytest.mark.scenario("SC-005")
 @pytest.mark.requirement("AC-005")

@@ -1,70 +1,75 @@
 version: 0.1
 runson: linux
-
-# ── Execution mode: AutoSplit ─────────────────────────────────────────────────
-# HyperExecute AI distributes tests intelligently across VMs
 autosplit: true
 concurrency: 4
 
-# ── Environment ───────────────────────────────────────────────────────────────
 env:
-  LT_USERNAME: ${LT_USERNAME}
-  LT_ACCESS_KEY: ${LT_ACCESS_KEY}
   TARGET_URL: https://www.americanexpress.com/
+  USE_REMOTE_GRID: "false"
 
-# ── Runtime ───────────────────────────────────────────────────────────────────
 runtime:
   language: python
   version: "3.11"
 
-# ── Dependency caching ────────────────────────────────────────────────────────
 cacheKey: "{{ checksum \"requirements.txt\" }}"
 cacheDirectories:
   - .pip_cache
 
-# ── Pre-test setup ────────────────────────────────────────────────────────────
 pre:
   - pip install --cache-dir .pip_cache -r requirements.txt
+  - pip install pytest-html selenium
 
-# ── Test discovery ────────────────────────────────────────────────────────────
 testDiscovery:
   type: raw
-  mode: static
-  command: grep -rn "^def test_" tests/selenium/test_credit_cards.py | awk -F: '{print "tests/selenium/test_credit_cards.py::" $3}' | awk '{print $1}' | sed 's/(driver)//'
+  mode: dynamic
+  command: |
+    python3 - <<'PY'
+    from pathlib import Path
+    selection = Path("reports/pytest_selection.txt")
+    tests = []
+    if selection.exists():
+      tests = [line.strip() for line in selection.read_text().splitlines() if line.strip()]
+    if not tests:
+      tests = [
+        "tests/selenium/test_credit_cards.py::test_sc_001_navigate_to_credit_cards_and_view_list",
+        "tests/selenium/test_credit_cards.py::test_sc_002_filter_cards_by_category",
+        "tests/selenium/test_credit_cards.py::test_sc_003_click_card_view_details",
+        "tests/selenium/test_credit_cards.py::test_sc_004_card_highlights_visible_without_login",
+        "tests/selenium/test_credit_cards.py::test_sc_005_relevant_results_for_selected_filter",
+      ]
+    for t in tests:
+      print(t)
+    PY
 
-# ── Test execution ────────────────────────────────────────────────────────────
-testRunnerCommand: pytest $test -v --html=reports/$test_report.html --self-contained-html --tb=short
+testRunnerCommand: python3 ci/run_pytest_node.py "$test"
 
-# ── Artifacts ────────────────────────────────────────────────────────────────
 mergeArtifacts: true
 uploadArtefacts:
   - name: selenium-test-reports
-    path: reports/
+    path:
+      - reports/
+  - name: hyperexecute-runtime
+    path:
+      - hyperexecute-cli.log
 
-# ── Retry on flakiness ────────────────────────────────────────────────────────
 retryOnFailure: true
 maxRetries: 2
 
-# ── Reporting ────────────────────────────────────────────────────────────────
 report: true
 partialReports:
-  frameworkName: pytest
-  location: reports/
-  type: html
+  - frameworkName: extent
+    type: html
+    location: reports/html
 
-# ── Post-test: upload reports ─────────────────────────────────────────────────
 post:
-  - echo "Tests complete. Reports in reports/"
+  - echo "Tests complete"
 
-# ── Timeouts ─────────────────────────────────────────────────────────────────
 globalTimeout: 60
 testSuiteTimeout: 45
 
-# ── Job metadata ─────────────────────────────────────────────────────────────
 jobLabel:
   - amex-credit-cards
   - agentic-sdlc
   - selenium-python
 
-# ── Video recording ───────────────────────────────────────────────────────────
 captureScreenRecordingForScenarios: true

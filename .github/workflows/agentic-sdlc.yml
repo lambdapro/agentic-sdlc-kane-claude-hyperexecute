@@ -1,128 +1,38 @@
-name: Agentic SDLC Pipeline
-
-# Triggers: push to requirements/ OR manual dispatch
-# Each job runs one pipeline stage from PIPELINE.md via Claude Code.
-# The same pattern works in GitLab CI, Jenkins, and Bitbucket unchanged.
-# Required secrets: LT_USERNAME, LT_ACCESS_KEY, ANTHROPIC_API_KEY
+name: Pure CI Pipeline
 
 on:
   push:
     paths:
-      - 'requirements/**'
+      - "requirements/**"
+      - "scenarios/**"
+      - "tests/**"
+      - "ci/**"
+      - "hyperexecute.yaml"
+      - ".hyperexecuteignore"
+      - ".github/workflows/agentic-sdlc.yml"
   pull_request:
     paths:
-      - 'requirements/**'
+      - "requirements/**"
+      - "scenarios/**"
+      - "tests/**"
+      - "ci/**"
+      - "hyperexecute.yaml"
+      - ".hyperexecuteignore"
+      - ".github/workflows/agentic-sdlc.yml"
   workflow_dispatch:
     inputs:
       full_run:
-        description: Run all tests not just changed scenarios
+        description: Run all active scenarios instead of incremental selection
         required: false
-        default: 'false'
+        default: "true"
 
 env:
-  NODE_VERSION: '20'
-  PYTHON_VERSION: '3.11'
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.11"
 
 jobs:
-
-  # Stage 1 - Parse requirements and verify each AC on the live site via Kane CLI
-  analyze-requirements:
-    name: Stage 1 - Analyze Requirements
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Kane CLI and Claude Code
-        run: npm install -g @testmuai/kane-cli @anthropic-ai/claude-code
-
-      - name: Execute ANALYZE_REQUIREMENTS stage
-        env:
-          LT_USERNAME: ${{ secrets.LT_USERNAME }}
-          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude -p "Execute stage: ANALYZE_REQUIREMENTS from PIPELINE.md"
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: analyzed-requirements
-          path: requirements/analyzed_requirements.json
-
-  # Stage 2 - Diff scenarios.json: update changed, add new, deprecate removed
-  manage-scenarios:
-    name: Stage 2 - Manage Scenarios
-    needs: analyze-requirements
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: analyzed-requirements
-          path: requirements/
-
-      - name: Execute MANAGE_SCENARIOS stage
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude -p "Execute stage: MANAGE_SCENARIOS from PIPELINE.md"
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: scenarios
-          path: scenarios/scenarios.json
-
-  # Stage 3 - Write/update Selenium Python tests for new and changed scenarios
-  generate-tests:
-    name: Stage 3 - Generate Tests
-    needs: manage-scenarios
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: scenarios
-          path: scenarios/
-
-      - name: Execute GENERATE_TESTS stage
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude -p "Execute stage: GENERATE_TESTS from PIPELINE.md"
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-suite
-          path: |
-            tests/
-            kane/objectives.json
-
-  # Stage 4 - Select tests then execute in parallel on HyperExecute cloud
-  execute-tests:
-    name: Stage 4 - Execute Tests on HyperExecute
-    needs: generate-tests
+  analyze:
+    name: Analyze Requirements
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -135,82 +45,224 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+
+      - name: Run pure CI analyze stage
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: python ci/analyze_requirements.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: analyzed-requirements
+          path: |
+            requirements/analyzed_requirements.json
+            reports/kane_results.json
+
+  manage:
+    name: Manage Scenarios
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/download-artifact@v4
         with:
-          name: test-suite
+          name: analyzed-requirements
           path: .
 
-      - name: Execute SELECT_TESTS stage
+      - name: Run pure CI manage stage
+        run: python ci/manage_scenarios.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: managed-scenarios
+          path: scenarios/scenarios.json
+
+  generate:
+    name: Generate Tests
+    needs: manage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: managed-scenarios
+          path: scenarios
+
+      - name: Run pure CI generate stage
+        run: python ci/generate_tests_from_scenarios.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-assets
+          path: |
+            tests/selenium/test_credit_cards.py
+            kane/objectives.json
+            scenarios/scenarios.json
+
+  select:
+    name: Select Tests
+    needs: generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: managed-scenarios
+          path: scenarios
+
+      - name: Run pure CI select stage
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          FULL_RUN: ${{ inputs.full_run || 'false' }}
-        run: |
-          claude -p "Execute stage: SELECT_TESTS from PIPELINE.md"
+          FULL_RUN: ${{ inputs.full_run || 'true' }}
+        run: python ci/select_tests.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: selection
+          path: |
+            reports/test_execution_manifest.json
+            reports/pytest_selection.txt
+
+  execute:
+    name: Execute Selenium On HyperExecute
+    needs: select
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: generated-assets
+          path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: selection
+          path: reports
 
       - name: Download HyperExecute CLI
         run: |
           curl -O https://downloads.lambdatest.com/hyperexecute/linux/hyperexecute
           chmod +x hyperexecute
 
-      - name: Run tests on HyperExecute
+      - name: Run selected tests on HyperExecute
+        id: hyperexecute
+        continue-on-error: true
         env:
           LT_USERNAME: ${{ secrets.LT_USERNAME }}
           LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
         run: |
-          ./hyperexecute --user $LT_USERNAME --key $LT_ACCESS_KEY --config hyperexecute.yaml
+          ./hyperexecute \
+            --user "$LT_USERNAME" \
+            --key "$LT_ACCESS_KEY" \
+            --config hyperexecute.yaml \
+            --download-artifacts \
+            --download-artifacts-path reports/hyperexecute-artifacts \
+            --download-report \
+            --download-logs
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: reports/
+          path: |
+            reports/
+            .hyperexecute/result.json
+            hyperexecute-cli.log
 
-  # Stage 5 - Build traceability matrix and produce QA release recommendation
-  traceability-and-recommendation:
-    name: Stage 5 - Traceability and Release Recommendation
-    needs: execute-tests
-    runs-on: ubuntu-latest
+      - name: Fail job if HyperExecute reported test failures
+        if: steps.hyperexecute.outcome == 'failure'
+        run: exit 1
+
+  analyze-failures:
+    name: Analyze HyperExecute Failures
+    needs: execute
     if: always()
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: analyzed-requirements
-          path: requirements/
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: scenarios
-          path: scenarios/
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/download-artifact@v4
         if: always()
         with:
           name: test-results
-          path: reports/
+          path: .
 
-      - name: Execute TRACEABILITY_REPORT stage
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude -p "Execute stage: TRACEABILITY_REPORT from PIPELINE.md"
+      - name: Build HyperExecute failure analysis
+        run: python ci/analyze_hyperexecute_failures.py --junit-dir reports
 
-      - name: Execute RELEASE_RECOMMENDATION stage
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude -p "Execute stage: RELEASE_RECOMMENDATION from PIPELINE.md"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: failure-analysis
+          path: reports/hyperexecute_failure_analysis.md
+
+  report:
+    name: Traceability And Recommendation
+    needs: [analyze, manage, select, execute, analyze-failures]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: analyzed-requirements
+          path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: managed-scenarios
+          path: scenarios
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: selection
+          path: reports
+
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: .
+
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: failure-analysis
+          path: reports
+
+      - name: Build traceability matrix
+        run: python ci/build_traceability.py --pytest-junit reports
+
+      - name: Build release recommendation
+        run: python ci/release_recommendation.py
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -218,8 +270,12 @@ jobs:
           name: release-reports
           path: |
             reports/traceability_matrix.md
+            reports/traceability_matrix.json
             reports/release_recommendation.md
+            reports/hyperexecute_failure_analysis.md
 
-      - name: Print release recommendation
+      - name: Print release recommendation and failure analysis
         if: always()
-        run: cat reports/release_recommendation.md 2>/dev/null || echo "Report not generated"
+        run: |
+          cat reports/release_recommendation.md 2>/dev/null || echo "Release report not generated"
+          cat reports/hyperexecute_failure_analysis.md 2>/dev/null || echo "Failure analysis not generated"

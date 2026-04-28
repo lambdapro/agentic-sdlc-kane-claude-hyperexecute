@@ -47,10 +47,12 @@ def driver(request):
         opts.add_argument("--headless")
         opts.add_argument("--no-sandbox")
         opts.add_argument("--disable-dev-shm-usage")
+        opts.add_argument("--window-size=1440,2200")
         driver = webdriver.Chrome(options=opts)
 
     driver.set_page_load_timeout(30)
     driver.implicitly_wait(10)
+    driver.set_window_size(1440, 2200)
 
     yield driver
 

@@ -36,16 +36,21 @@ def load_junit_results(path):
     file_path = Path(path)
     if not file_path.exists():
         return {}
-    root = ET.fromstring(file_path.read_text(encoding="utf-8"))
     results = {}
-    for testcase in root.iter("testcase"):
-        name = testcase.attrib.get("name", "")
-        result = "passed"
-        if testcase.find("failure") is not None or testcase.find("error") is not None:
-            result = "failed"
-        elif testcase.find("skipped") is not None:
-            result = "skipped"
-        results[name] = result
+    xml_files = [file_path] if file_path.is_file() else sorted(file_path.rglob("*.xml"))
+    for xml_file in xml_files:
+        try:
+            root = ET.fromstring(xml_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for testcase in root.iter("testcase"):
+            name = testcase.attrib.get("name", "")
+            result = "passed"
+            if testcase.find("failure") is not None or testcase.find("error") is not None:
+                result = "failed"
+            elif testcase.find("skipped") is not None:
+                result = "skipped"
+            results[name] = result
     return results
 
 
