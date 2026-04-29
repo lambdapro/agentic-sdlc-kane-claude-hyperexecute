@@ -78,7 +78,8 @@ jobs:
 
           # Pull Gemma model and create named alias with 128k context
           ollama pull gemma4:e4b
-          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' | ollama create gemma-local -f -
+          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' > /tmp/Modelfile
+          ollama create gemma-local -f /tmp/Modelfile
           echo "Gemma model ready: $(ollama list | grep gemma)"
 
           # Install LiteLLM proxy — translates Anthropic API format to Ollama
@@ -145,7 +146,8 @@ jobs:
           ollama serve &
           sleep 5
           ollama pull gemma4:e4b
-          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' | ollama create gemma-local -f -
+          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' > /tmp/Modelfile
+          ollama create gemma-local -f /tmp/Modelfile
           pip install 'litellm[proxy]'
           cat > /tmp/litellm_config.yaml << 'EOF'
           model_list:
@@ -200,7 +202,8 @@ jobs:
           ollama serve &
           sleep 5
           ollama pull gemma4:e4b
-          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' | ollama create gemma-local -f -
+          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' > /tmp/Modelfile
+          ollama create gemma-local -f /tmp/Modelfile
           pip install 'litellm[proxy]'
           cat > /tmp/litellm_config.yaml << 'EOF'
           model_list:
@@ -258,7 +261,8 @@ jobs:
           ollama serve &
           sleep 5
           ollama pull gemma4:e4b
-          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' | ollama create gemma-local -f -
+          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' > /tmp/Modelfile
+          ollama create gemma-local -f /tmp/Modelfile
           pip install 'litellm[proxy]'
           cat > /tmp/litellm_config.yaml << 'EOF'
           model_list:
@@ -442,7 +446,8 @@ jobs:
           ollama serve &
           sleep 5
           ollama pull gemma4:e4b
-          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' | ollama create gemma-local -f -
+          printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' > /tmp/Modelfile
+          ollama create gemma-local -f /tmp/Modelfile
           pip install 'litellm[proxy]'
           cat > /tmp/litellm_config.yaml << 'EOF'
           model_list:
