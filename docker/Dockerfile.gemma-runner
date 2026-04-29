@@ -1,0 +1,41 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV OLLAMA_HOST=0.0.0.0
+
+# System deps
+RUN apt-get update && apt-get install -y \
+    curl python3 python3-pip ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull Gemma model at build time so it's baked into the image layer
+# ollama must be running to pull; use a one-shot serve → pull → stop
+RUN ollama serve & sleep 5 \
+    && ollama pull gemma4:e4b \
+    && printf 'FROM gemma4:e4b\nPARAMETER num_ctx 128000\n' > /tmp/Modelfile \
+    && ollama create gemma-local -f /tmp/Modelfile \
+    && ollama list \
+    && kill %1 2>/dev/null || true
+
+# Install LiteLLM proxy
+RUN pip3 install 'litellm[proxy]'
+
+# Write LiteLLM config that routes claude-3-haiku → gemma-local
+RUN mkdir -p /etc/litellm && cat > /etc/litellm/config.yaml << 'EOF'
+model_list:
+  - model_name: claude-3-haiku-20240307
+    litellm_params:
+      model: ollama_chat/gemma-local
+      api_base: http://localhost:11434
+EOF
+
+# Startup script: launch Ollama + LiteLLM in foreground
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 4000 11434
+
+ENTRYPOINT ["/entrypoint.sh"]
