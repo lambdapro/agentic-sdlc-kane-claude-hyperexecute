@@ -7,6 +7,7 @@ env:
   LT_USERNAME: ${LT_USERNAME}
   LT_ACCESS_KEY: ${LT_ACCESS_KEY}
   TARGET_URL: https://ecommerce-playground.lambdatest.io/
+  USE_REMOTE_GRID: "true"
 
 runtime:
   language: python
@@ -24,7 +25,7 @@ testDiscovery:
   mode: dynamic
   command: cat reports/pytest_selection.txt
 
-testRunnerCommand: pytest tests/selenium/test_products.py::$test -v --tb=short --html=reports/$test.html --self-contained-html
+testRunnerCommand: pytest "$test" -v --tb=short
 
 mergeArtifacts: true
 uploadArtefacts:
