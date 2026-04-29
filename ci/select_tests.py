@@ -6,10 +6,10 @@ from pathlib import Path
 
 
 FUNCTION_NAMES = {
-    "SC-001": "test_sc_001_navigate_to_credit_cards_and_view_list",
-    "SC-002": "test_sc_002_filter_cards_by_category",
-    "SC-003": "test_sc_003_click_card_view_details",
-    "SC-004": "test_sc_004_card_highlights_visible_without_login",
+    "SC-001": "test_sc_001_navigate_to_products_and_view_list",
+    "SC-002": "test_sc_002_filter_products_by_category",
+    "SC-003": "test_sc_003_click_product_view_details",
+    "SC-004": "test_sc_004_product_highlights_visible_without_login",
     "SC-005": "test_sc_005_relevant_results_for_selected_filter",
 }
 
@@ -61,7 +61,7 @@ def main():
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     selection_lines = [
-        f"tests/selenium/test_credit_cards.py::{function_name_for(scenario['id'])}"
+        f"tests/selenium/test_products.py::{function_name_for(scenario['id'])}"
         for scenario in selected
     ]
     selection_path = Path(args.selection)
