@@ -41,7 +41,7 @@ def title_and_steps(requirement):
             [
                 "Navigate to https://ecommerce-playground.lambdatest.io/",
                 "Go to a category page",
-                "Locate filter options on the sidebar",
+                "Locate filter options such as Apple, Samsung, or Canon on the sidebar",
                 "Select a filter",
                 "Verify the product list updates to show filtered results",
             ],

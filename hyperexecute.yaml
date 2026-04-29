@@ -45,7 +45,7 @@ testSuiteTimeout: 45
 
 jobLabel:
   - amex-credit-cards
-  - agentic-sdlc
+  - agentic-stlc
   - selenium-python
 
 captureScreenRecordingForScenarios: true

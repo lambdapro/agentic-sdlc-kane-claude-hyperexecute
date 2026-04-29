@@ -5,11 +5,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
-class CreditCardsPage:
-    URL = "https://www.americanexpress.com/"
-    CREDIT_CARDS_NAV = (By.XPATH, "//a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'credit card')]")
+class ProductsPage:
+    URL = "https://ecommerce-playground.lambdatest.io/"
+    SHOP_NAV = (By.XPATH, "//a[contains(., 'Shop')] | //span[contains(., 'Category')]")
     CARD_TILES = (By.CSS_SELECTOR, "[class*='card-tile'], [class*='CardTile'], [data-testid*='card']")
-    FILTER_CHIPS = (By.CSS_SELECTOR, "[class*='filter-chip'], [class*='FilterChip'], [role='tab']")
+    FILTER_CHIPS = (By.CSS_SELECTOR, ".list-group-item, [class*='filter-chip'], [role='tab']")
     VIEW_DETAILS_LINKS = (By.XPATH, "//a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'view detail') or contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'learn more')]")
     CARD_BENEFITS = (By.XPATH, "//*[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'benefit') or contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'reward') or contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'annual fee')]")
     LOGIN_BUTTON = (By.XPATH, "//a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'log in') or contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'sign in')]")
@@ -76,10 +76,10 @@ class CreditCardsPage:
         self.wait_for_ready_state()
         self.dismiss_common_overlays()
         try:
-            cc_link = self.wait.until(EC.element_to_be_clickable(self.CREDIT_CARDS_NAV))
-            self.safe_click(cc_link)
+            shop_link = self.wait.until(EC.element_to_be_clickable(self.SHOP_NAV))
+            self.safe_click(shop_link)
         except Exception:
-            self.driver.get("https://www.americanexpress.com/us/credit-cards/")
+            self.driver.get("https://ecommerce-playground.lambdatest.io/index.php?route=product/category&path=57")
         self.wait_for_ready_state()
         self.dismiss_common_overlays()
 

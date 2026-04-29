@@ -1,8 +1,8 @@
-# Agentic SDLC — Kane AI + Claude + Ollama + HyperExecute
+# Agentic STLC — Kane AI + Claude + Ollama + HyperExecute
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Pure CI Pipeline](https://github.com/lambdapro/agentic-sdlc-kane-claude-hyperexecute/actions/workflows/agentic-sdlc.yml/badge.svg)](https://github.com/lambdapro/agentic-sdlc-kane-claude-hyperexecute/actions/workflows/agentic-sdlc.yml)
-[![Agentic Pipeline](https://github.com/lambdapro/agentic-sdlc-kane-claude-hyperexecute/actions/workflows/agentic-sdlc-claude.yml/badge.svg)](https://github.com/lambdapro/agentic-sdlc-kane-claude-hyperexecute/actions/workflows/agentic-sdlc-claude.yml)
+[![Pure CI Pipeline](https://github.com/lambdapro/agentic-stlc-kane-claude-hyperexecute/actions/workflows/agentic-stlc.yml/badge.svg)](https://github.com/lambdapro/agentic-stlc-kane-claude-hyperexecute/actions/workflows/agentic-stlc.yml)
+[![Agentic Pipeline](https://github.com/lambdapro/agentic-stlc-kane-claude-hyperexecute/actions/workflows/agentic-stlc-claude.yml/badge.svg)](https://github.com/lambdapro/agentic-stlc-kane-claude-hyperexecute/actions/workflows/agentic-stlc-claude.yml)
 
 > **Open source under the MIT License.** Fork it, adapt it, ship it.
 
@@ -127,7 +127,7 @@ python ci/build_traceability.py         # Stage 5a: generates reports/traceabili
 python ci/release_recommendation.py    # Stage 5b: generates reports/release_recommendation.md
 ```
 
-The checked-in GitHub Actions workflow at [`.github/workflows/agentic-sdlc.yml`](.github/workflows/agentic-sdlc.yml) uses **Mode B** — no `ANTHROPIC_API_KEY` required.
+The checked-in GitHub Actions workflow at [`.github/workflows/agentic-stlc.yml`](.github/workflows/agentic-stlc.yml) uses **Mode B** — no `ANTHROPIC_API_KEY` required.
 
 ---
 
@@ -285,8 +285,8 @@ requirements/search.txt  (plain English user story)
 │   └── release_recommendation.md
 │
 └── .github/workflows/
-    ├── agentic-sdlc.yml                     # Pure CI pipeline (Python scripts, no LLM in CI)
-    └── agentic-sdlc-claude.yml              # Agentic pipeline (Claude CLI + Ollama/Gemma)
+    ├── agentic-stlc.yml                     # Pure CI pipeline (Python scripts, no LLM in CI)
+    └── agentic-stlc-claude.yml              # Agentic pipeline (Claude CLI + Ollama/Gemma)
 ```
 
 ---
@@ -311,8 +311,8 @@ requirements/search.txt  (plain English user story)
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/lambdapro/agentic-sdlc-kane-claude-hyperexecute.git
-cd agentic-sdlc-kane-claude-hyperexecute
+git clone https://github.com/lambdapro/agentic-stlc-kane-claude-hyperexecute.git
+cd agentic-stlc-kane-claude-hyperexecute
 
 # Install Kane CLI (required for all modes)
 npm install -g @testmuai/kane-cli
@@ -379,7 +379,7 @@ Two pipelines are available:
 | Workflow | Trigger | What runs |
 |---|---|---|
 | **Pure CI Pipeline** | Push to `requirements/**` or `scenarios/**` | Python scripts — fast, deterministic, no LLM in CI |
-| **Agentic SDLC** | Push to `requirements/**` or `PIPELINE.md` | Claude CLI + Ollama/Gemma — fully agentic, update `PIPELINE.md` to change behavior |
+| **Agentic STLC** | Push to `requirements/**` or `PIPELINE.md` | Claude CLI + Ollama/Gemma — fully agentic, update `PIPELINE.md` to change behavior |
 
 Watch it run: **GitHub > Actions**
 

@@ -5,10 +5,10 @@ from pathlib import Path
 
 
 FUNCTION_NAMES = {
-    "SC-001": "test_sc_001_navigate_to_credit_cards_and_view_list",
-    "SC-002": "test_sc_002_filter_cards_by_category",
-    "SC-003": "test_sc_003_click_card_view_details",
-    "SC-004": "test_sc_004_card_highlights_visible_without_login",
+    "SC-001": "test_sc_001_navigate_to_products_and_view_list",
+    "SC-002": "test_sc_002_filter_products_by_category",
+    "SC-003": "test_sc_003_click_product_view_details",
+    "SC-004": "test_sc_004_product_highlights_visible_without_login",
     "SC-005": "test_sc_005_relevant_results_for_selected_filter",
 }
 
@@ -21,7 +21,7 @@ Each test maps to one acceptance criterion in requirements/search.txt.
 
 import pytest
 from selenium.webdriver.support.ui import WebDriverWait
-from tests.selenium.pages.credit_cards_page import CreditCardsPage
+from tests.selenium.pages.products_page import ProductsPage
 
 '''
 
@@ -29,7 +29,7 @@ from tests.selenium.pages.credit_cards_page import CreditCardsPage
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenarios", default="scenarios/scenarios.json")
-    parser.add_argument("--tests-out", default="tests/selenium/test_credit_cards.py")
+    parser.add_argument("--tests-out", default="tests/selenium/test_products.py")
     parser.add_argument("--objectives-out", default="kane/objectives.json")
     return parser.parse_args()
 
@@ -47,25 +47,25 @@ def build_test_function(scenario):
     title = scenario["title"].replace('"', "'")
     if scenario["id"] == "SC-001":
         body = '''
-    page = CreditCardsPage(driver)
+    page = ProductsPage(driver)
     page.navigate_to_credit_cards()
 
-    assert "credit-card" in page.current_url().lower() or "credit-cards" in page.current_url().lower(), (
-        f"Expected credit cards URL, got: {page.current_url()}"
+    assert "product" in page.current_url().lower() or "shop" in page.current_url().lower(), (
+        f"Expected product URL, got: {page.current_url()}"
     )
 
     card_tiles = page.get_card_tiles()
-    assert len(card_tiles) > 0, "Expected at least one credit card tile to be visible on the page"
+    assert len(card_tiles) > 0, "Expected at least one product tile to be visible on the page"
 '''
     elif scenario["id"] == "SC-002":
         body = '''
-    page = CreditCardsPage(driver)
+    page = ProductsPage(driver)
     page.navigate_to_credit_cards()
 
     filter_chips = page.get_filter_chips()
-    assert len(filter_chips) > 0, "Expected filter chips to be present on the credit cards page"
+    assert len(filter_chips) > 0, "Expected filter options to be present on the page"
 
-    filter_names = ["Travel", "Cash Back", "Rewards", "Featured", "Business"]
+    filter_names = ["Apple", "Samsung", "HTC", "Canon", "Nikon"]
     applied = False
     for name in filter_names:
         if page.apply_filter(name):
@@ -75,16 +75,16 @@ def build_test_function(scenario):
     assert applied, f"Could not apply any of the expected filters: {filter_names}"
 
     card_tiles = page.get_card_tiles()
-    assert len(card_tiles) > 0, "Expected filtered card results to be displayed after applying a filter"
+    assert len(card_tiles) > 0, "Expected filtered product results to be displayed after applying a filter"
 '''
     elif scenario["id"] == "SC-003":
         body = '''
-    page = CreditCardsPage(driver)
+    page = ProductsPage(driver)
     page.navigate_to_credit_cards()
 
     initial_url = page.current_url()
     clicked = page.click_first_card_details()
-    assert clicked, "Could not find any View Details link or card tile to click"
+    assert clicked, "Could not find any product tile or title to click"
 
     WebDriverWait(driver, 15).until(
         lambda current_driver: current_driver.current_url != initial_url or len(page.get_card_benefits_elements()) > 0
@@ -92,34 +92,34 @@ def build_test_function(scenario):
 
     benefits = page.get_card_benefits_elements()
     assert len(benefits) > 0, (
-        "Expected benefits, rewards, or annual fee information on the card detail page. "
+        "Expected price or description information on the product detail page. "
         f"Current URL: {page.current_url()}"
     )
 '''
     elif scenario["id"] == "SC-004":
         body = '''
-    page = CreditCardsPage(driver)
+    page = ProductsPage(driver)
     page.navigate_to_credit_cards()
 
-    assert not page.is_login_gate_present(), "Expected the credit cards page to be browseable without an auth gate"
-    assert page.has_guest_browsing_content(), "Expected card highlights or card tiles to be visible without logging in"
+    assert not page.is_login_gate_present(), "Expected the page to be browseable without an auth gate"
+    assert page.has_guest_browsing_content(), "Expected product highlights to be visible without logging in"
 '''
     else:
         body = '''
-    page = CreditCardsPage(driver)
+    page = ProductsPage(driver)
     page.navigate_to_credit_cards()
 
-    applied = page.apply_filter("Travel")
+    applied = page.apply_filter("Apple")
     if not applied:
-        applied = page.apply_filter("Cash Back")
+        applied = page.apply_filter("Samsung")
 
-    assert applied, "Could not apply Travel or Cash Back filter"
+    assert applied, "Could not apply search filter"
 
     card_tiles = page.get_card_tiles()
     assert len(card_tiles) > 0, "Expected card results after applying a filter"
 
     page_text = driver.find_element("tag name", "body").text.lower()
-    relevant_keywords = ["travel", "cash back", "reward", "points", "miles", "platinum", "gold"]
+    relevant_keywords = ["phone", "laptop", "camera", "tablet", "apple", "samsung"]
     assert any(keyword in page_text for keyword in relevant_keywords), (
         "Expected filtered results to contain relevant keywords matching the selected filter. "
         f"Checked for: {relevant_keywords}"

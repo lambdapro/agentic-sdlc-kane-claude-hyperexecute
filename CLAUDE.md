@@ -1,7 +1,7 @@
-# Claude Code — Agentic SDLC Project Config
+# Claude Code — Agentic STLC Project Config
 
 ## Project Overview
-End-to-end agentic SDLC demo using Kane AI CLI + Selenium Python + HyperExecute targeting an eCommerce playground.
+End-to-end agentic STLC demo using Kane AI CLI + Selenium Python + HyperExecute targeting an eCommerce playground.
 Requirements drive the entire pipeline; stages are defined in PIPELINE.md.
 
 ## How to Execute a Pipeline Stage

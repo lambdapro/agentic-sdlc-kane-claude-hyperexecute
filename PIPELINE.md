@@ -1,4 +1,4 @@
-# Agentic SDLC Pipeline
+# Agentic STLC Pipeline
 
 This file is the natural language instruction file for the agentic CI/CD pipeline.
 Any CI tool invokes a stage by running:
