@@ -112,8 +112,7 @@ The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-
 │   └── release_recommendation.md
 │
 └── .github/workflows/
-    ├── agentic-stlc.yml                     # Pure CI pipeline (Python scripts, no LLM in CI)
-    └── agentic-stlc-claude.yml              # Agentic pipeline (Claude CLI + Ollama/Gemma)
+    └── agentic-stlc.yml                     # Agentic STLC Pipeline (Python scripts + Kane AI)
 ```
 
 ---

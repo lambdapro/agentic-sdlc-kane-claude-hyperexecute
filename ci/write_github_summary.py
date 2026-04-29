@@ -222,16 +222,19 @@ def main():
     emit("")
 
     he_total = he_api.get("total_tasks") or len(selected)
-    he_failed_api = he_api.get("failed_tasks")
-    # Ensure summary metrics are consistent with actual execution data
+    he_failed_api = he_api.get("failed_tasks") # Initialize he_failed_api
+    he_passed_api = he_api.get("passed_tasks") # Initialize he_passed_api here to prevent UnboundLocalError
+
+    # Ensure summary metrics are consistent with actual execution data for he_failed_api
     if he_failed_api is None:
         if executed > 0:
             he_failed_api = failed_count
         else:
-            he_failed_api = he_total if he_total > 0 else 0
-            
+            he_failed_api = he_total if he_total > 0 else 0 # Default to 0 if no tasks
+
+    # Ensure summary metrics are consistent with actual execution data for he_passed_api
     if he_passed_api is None:
-        he_passed_api = passed if executed > 0 else 0
+        he_passed_api = passed if executed > 0 else 0 # Default to 0 if no tasks
 
     he_status = he_api.get("status", "unknown")
 
