@@ -4,9 +4,10 @@ FROM ollama/ollama:latest
 ENV OLLAMA_HOST=0.0.0.0
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Add Python + pip for LiteLLM
+# Add Python + build tools for LiteLLM
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip curl \
+    python3 python3-pip python3-dev \
+    build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Pull Gemma model at build time — baked into image layer, zero pull at runtime
@@ -20,7 +21,7 @@ RUN ollama serve & \
     kill $OLLAMA_PID 2>/dev/null || true
 
 # Install LiteLLM proxy
-RUN pip3 install 'litellm[proxy]'
+RUN pip3 install --upgrade pip && pip3 install --no-cache-dir 'litellm[proxy]'
 
 # Write LiteLLM config that routes claude-3-haiku → gemma-local
 RUN mkdir -p /etc/litellm && cat > /etc/litellm/config.yaml << 'EOF'
