@@ -1,11 +1,11 @@
 # Agentic STLC — Kane AI + HyperExecute
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[!Pipeline Status](https://github.com/lambdapro/agentic-stlc/actions/workflows/agentic-stlc.yml/badge.svg)](https://github.com/lambdapro/agentic-stlc/actions/workflows/agentic-stlc.yml)
+[![Pipeline Status](https://github.com/lambdapro/agentic-stlc/actions/workflows/agentic-stlc.yml/badge.svg)](https://github.com/lambdapro/agentic-stlc/actions/workflows/agentic-stlc.yml)
 
 > **Open source under the MIT License.** Fork it, adapt it, ship it.
 
-An end-to-end **Agentic Software Development Lifecycle (STLC)** where plain-English requirements drive every stage of QA — from requirement analysis to parallel cloud execution and a final release verdict.
+An end-to-end **Agentic Software Testing Lifecycle (STLC)** where plain-English requirements drive every stage of QA — from requirement analysis to parallel cloud execution and a final release verdict. Kane CLI is the sole test executor: it receives a plain-English objective, drives a real browser on LambdaTest Automate, and returns a pass/fail result with a session link.
 
 ---
 
@@ -13,10 +13,10 @@ An end-to-end **Agentic Software Development Lifecycle (STLC)** where plain-Engl
 
 | Tool | Role in the pipeline |
 |---|---|
-| **Kane CLI** (`@testmuai/kane-cli`) | AI browser agent — verifies each acceptance criterion against the live site using natural-language objectives |
-| **HyperExecute CLI** | Cloud parallel test runner — fans out Selenium tests across multiple VMs simultaneously, cutting execution time from hours to minutes |
-| **Selenium + pytest** | Test execution framework — auto-generated test cases run on LambdaTest's cloud grid |
-| **Python CI Scripts** | Orchestrators — synchronizes requirements, scenarios, and test code logic |
+| **Kane CLI** (`@testmuai/kane-cli`) | AI browser agent — verifies acceptance criteria in Stage 1 AND executes every test in Stage 4 using natural-language objectives |
+| **HyperExecute CLI** | Cloud parallel test runner — fans out Kane-wrapped pytest tests across multiple VMs simultaneously |
+| **pytest** | Test orchestration framework — wraps Kane CLI calls, reports pass/fail per test node to HyperExecute |
+| **Python CI Scripts** | Stage orchestrators — synchronize requirements, scenarios, and generated test code |
 
 ---
 
@@ -25,7 +25,7 @@ An end-to-end **Agentic Software Development Lifecycle (STLC)** where plain-Engl
 **Edit your requirements, commit, push.** That's it.
 
 ```bash
-# 1. Add/Edit requirements in plain English
+# 1. Add/edit requirements in plain English
 vim requirements/search.txt
 
 # 2. Commit and push
@@ -39,8 +39,8 @@ GitHub Actions picks up the push and runs the full pipeline:
 ```
 Stage 1: Analyze   → Kane AI browses the live site, verifies each acceptance criterion
 Stage 2: Manage    → Diffs scenarios.json, adds new, updates changed, deprecates removed
-Stage 3: Generate  → Writes Selenium Python test cases for every new/changed scenario
-Stage 4: Execute   → HyperExecute runs selected tests in parallel across cloud VMs
+Stage 3: Generate  → Writes Kane-wrapped pytest tests for every new/changed scenario
+Stage 4: Execute   → HyperExecute fans out tests; each test calls kane-cli run with its objective
 Stage 5: Report    → Traceability matrix + GREEN / YELLOW / RED release recommendation
 ```
 
@@ -54,8 +54,9 @@ No human writes a single test. No one maps a requirement to code. The pipeline d
 |---|---|
 | LLMs burn tokens on repetitive UI clicks | **Kane AI** is a specialized testing agent — no wasted reasoning |
 | One CI runner is too slow for 50+ tests | **HyperExecute** fans out to 4–1000 parallel VMs |
-| Tests drift from requirements | **Scenarios are regenerated** every time requirements change |
+| Tests drift from requirements | **Scenarios and tests are regenerated** every time requirements change |
 | QA verdict is manual and subjective | **Release recommendation** is generated from actual test data |
+| Brittle CSS selectors break on site changes | **Kane objectives are plain English** — no selector maintenance |
 
 ---
 
@@ -63,11 +64,11 @@ No human writes a single test. No one maps a requirement to code. The pipeline d
 
 The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-driven stages:
 
-1.  **Stage 1 - Analyze Requirements**: `ci/analyze_requirements.py` runs Kane AI against the live site to verify acceptance criteria.
-2.  **Stage 2 - Manage Scenarios**: `ci/manage_scenarios.py` synchronizes the scenario catalog.
-3.  **Stage 3 - Generate Tests**: `ci/generate_tests_from_scenarios.py` writes/updates Selenium Python tests.
-4.  **Stage 4 - Execution**: Selected tests are submitted to **HyperExecute** for parallel cloud execution.
-5.  **Stage 5 - Reporting**: Requirement traceability matrix and release verdict are produced.
+1. **Stage 1 - Analyze Requirements**: `ci/analyze_requirements.py` runs Kane CLI against the live site to verify each acceptance criterion.
+2. **Stage 2 - Manage Scenarios**: `ci/manage_scenarios.py` synchronizes the scenario catalog with analyzed requirements.
+3. **Stage 3 - Generate Tests**: `ci/generate_tests_from_scenarios.py` generates Kane-wrapped pytest tests — one function per scenario, each calling `kane-cli run <objective>`.
+4. **Stage 4 - Execution**: Selected tests are submitted to **HyperExecute**; each VM runs `pytest "$test"` which invokes Kane CLI for that objective.
+5. **Stage 5 - Reporting**: Requirement traceability matrix and release verdict are produced.
 
 ---
 
@@ -75,7 +76,7 @@ The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-
 
 ```
 .
-├── PIPELINE.md                              # Natural language stage instructions for Claude
+├── PIPELINE.md                              # Natural language stage instructions
 ├── CLAUDE.md                                # Claude Code project config
 ├── LICENSE                                  # MIT License
 ├── hyperexecute.yaml                        # HyperExecute cloud execution config
@@ -90,7 +91,7 @@ The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-
 ├── kane/
 │   └── objectives.json                      # Kane CLI objectives per scenario
 │
-├── ci/                                      # Pure CI stage scripts (no LLM needed)
+├── ci/                                      # CI stage scripts
 │   ├── analyze_requirements.py
 │   ├── manage_scenarios.py
 │   ├── generate_tests_from_scenarios.py
@@ -102,17 +103,17 @@ The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-
 │   └── write_github_summary.py
 │
 ├── tests/selenium/
-│   ├── conftest.py                          # pytest fixtures + LambdaTest WebDriver
+│   ├── conftest.py                          # pytest marker registration
 │   ├── pages/
-│   │   └── products_page.py                 # Page Object Model
-│   └── test_products.py                     # Selenium test cases (auto-generated)
+│   │   └── products_page.py                 # Page Object Model (local runs)
+│   └── test_products.py                     # Kane-wrapped tests (auto-generated)
 │
 ├── reports/                                 # Runtime output — gitignored
 │   ├── traceability_matrix.md
 │   └── release_recommendation.md
 │
 └── .github/workflows/
-    └── agentic-stlc.yml                     # Agentic STLC Pipeline (Python scripts + Kane AI)
+    └── agentic-stlc.yml                     # Agentic STLC Pipeline
 ```
 
 ---
@@ -121,14 +122,10 @@ The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-
 
 | Tool | Required for | Install |
 |---|---|---|
-| Node.js 18+ | Kane CLI + Claude CLI | [nodejs.org](https://nodejs.org) |
-| Python 3.11+ | CI scripts + Selenium | [python.org](https://python.org) |
-| Kane CLI | Requirement verification (all modes) | `npm install -g @testmuai/kane-cli` |
-| Claude CLI | Mode A (agentic) only | `npm install -g @anthropic-ai/claude-code` |
-| Ollama | Mode A in CI (local LLM) | `curl -fsSL https://ollama.com/install.sh \| sh` |
-| Gemma 4 (`gemma4:e4b`) | Mode A in CI (model) | `ollama pull gemma4:e4b` (after Ollama) |
-| HyperExecute CLI | Cloud parallel test execution | Downloaded automatically by CI |
-| Google Chrome | Local Selenium runs | [google.com/chrome](https://www.google.com/chrome) |
+| Node.js 18+ | Kane CLI | [nodejs.org](https://nodejs.org) |
+| Python 3.11+ | CI scripts + pytest | [python.org](https://python.org) |
+| Kane CLI | All stages | `npm install -g @testmuai/kane-cli` |
+| HyperExecute CLI | Cloud parallel execution | Downloaded automatically by CI |
 
 ---
 
@@ -140,10 +137,7 @@ The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-
 git clone https://github.com/lambdapro/agentic-stlc.git
 cd agentic-stlc
 
-# Install Kane CLI (required for all modes)
 npm install -g @testmuai/kane-cli
-
-# Install Python dependencies
 pip install -r requirements.txt
 ```
 
@@ -152,31 +146,27 @@ pip install -r requirements.txt
 ```bash
 export LT_USERNAME=your_lambdatest_username
 export LT_ACCESS_KEY=your_lambdatest_access_key
-
-# For agentic mode locally (uses Anthropic API directly)
-export ANTHROPIC_API_KEY=your_anthropic_api_key
-
-# For agentic mode with local Ollama (no Anthropic key needed)
-export ANTHROPIC_BASE_URL=http://localhost:11434/v1
-export ANTHROPIC_API_KEY=ollama
 ```
 
 | Credential | Where to get it |
 |---|---|
 | `LT_USERNAME` | [LambdaTest Dashboard > Settings > Keys](https://accounts.lambdatest.com/security) |
 | `LT_ACCESS_KEY` | Same page |
-| `ANTHROPIC_API_KEY` | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (not needed with Ollama) |
 
-### 3. Add GitHub secrets
+### 3. Authenticate Kane CLI
+
+```bash
+kane-cli login --username $LT_USERNAME --access-key $LT_ACCESS_KEY
+```
+
+### 4. Add GitHub secrets
 
 In your fork: **Settings > Secrets and variables > Actions > New repository secret**
 
-| Secret name | Value | Required for |
-|---|---|---|
-| `LT_USERNAME` | Your LambdaTest username | Both pipelines |
-| `LT_ACCESS_KEY` | Your LambdaTest access key | Both pipelines |
-
-`ANTHROPIC_API_KEY` is **not** required — the agentic pipeline uses Ollama + Gemma locally in each CI job.
+| Secret name | Value |
+|---|---|
+| `LT_USERNAME` | Your LambdaTest username |
+| `LT_ACCESS_KEY` | Your LambdaTest access key |
 
 ---
 
@@ -191,8 +181,6 @@ git commit -m "feat: add new acceptance criterion"
 git push
 ```
 
-The pipeline is available here:
-
 | Workflow | Trigger | Description |
 |---|---|---|
 | **Agentic STLC Pipeline** | Push to `requirements/**` or `scenarios/**` | Automated STLC orchestration using Kane AI |
@@ -201,15 +189,19 @@ Watch it run: **GitHub > Actions**
 
 ### Manual trigger
 
-Go to **Actions > [pipeline name] > Run workflow**. Set `full_run` to `true` to run all scenarios (not just changed ones).
+Go to **Actions > Pure CI Pipeline > Run workflow**. Set `full_run` to `true` to run all scenarios (not just changed ones).
 
 ---
 
 ## Running locally
 
-### Full pipeline — Pure CI mode (no Claude needed)
+### Full pipeline
 
 ```bash
+# Authenticate Kane CLI once
+kane-cli login --username $LT_USERNAME --access-key $LT_ACCESS_KEY
+
+# Run each stage
 python ci/analyze_requirements.py
 python ci/manage_scenarios.py
 python ci/generate_tests_from_scenarios.py
@@ -237,20 +229,22 @@ python ci/release_recommendation.py
 cat reports/release_recommendation.md
 ```
 
-### Selenium only — run tests directly
+### Run a single Kane test
 
 ```bash
-# All tests, local headless Chrome
-pytest tests/selenium/ -v
+# Single test — Kane AI drives a real browser on LambdaTest Automate
+PYTHONPATH=. pytest "tests/selenium/test_products.py::test_sc_001_navigate_to_products_and_view_list" -v -s
 
-# Single test
-pytest tests/selenium/test_credit_cards.py::test_sc_001_navigate_to_credit_cards_and_view_list -v
+# All tests
+PYTHONPATH=. pytest tests/selenium/test_products.py -v -s
+```
 
-# With HTML report
-pytest tests/selenium/ -v --html=reports/results.html --self-contained-html
+Each test prints its LambdaTest Automate session link on pass:
 
-# On LambdaTest remote grid
-LT_USERNAME=your_user LT_ACCESS_KEY=your_key pytest tests/selenium/ -v
+```
+PASSED  tests/selenium/test_products.py::test_sc_001_navigate_to_products_and_view_list
+
+Kane session: https://automation.lambdatest.com/test?testID=...
 ```
 
 ---
@@ -258,11 +252,10 @@ LT_USERNAME=your_user LT_ACCESS_KEY=your_key pytest tests/selenium/ -v
 ## Kane CLI — verify any requirement manually
 
 ```bash
-# Verify AC-001: product listing visible
+# Verify a requirement directly
 kane-cli run \
   "Navigate to the product section and verify a list of available products is displayed" \
   --url https://ecommerce-playground.lambdatest.io/ \
-  --username $LT_USERNAME --access-key $LT_ACCESS_KEY \
   --agent --headless --timeout 120
 
 # Parse result
@@ -276,7 +269,6 @@ for obj in $(jq -r '.[] | @base64' kane/objectives.json); do
   kane-cli run \
     "$(echo "$data" | jq -r '.objective')" \
     --url "$(echo "$data" | jq -r '.url')" \
-    --username $LT_USERNAME --access-key $LT_ACCESS_KEY \
     --agent --headless --timeout "$(echo "$data" | jq -r '.timeout')" \
     > "$RESULTS_DIR/$id.ndjson" 2>&1 &
 done
@@ -330,6 +322,7 @@ analyze-requirements:
   image: node:22
   script:
     - npm install -g @testmuai/kane-cli
+    - kane-cli login --username $LT_USERNAME --access-key $LT_ACCESS_KEY
     - pip install -r requirements.txt
     - python ci/analyze_requirements.py
   artifacts:
@@ -385,10 +378,10 @@ pipelines:
   default:
     - step:
         name: Analyze + Manage + Generate
-        image: python:3.11
+        image: node:22
         script:
-          - pip install -r requirements.txt
           - npm install -g @testmuai/kane-cli
+          - pip install -r requirements.txt
           - python ci/analyze_requirements.py
           - python ci/manage_scenarios.py
           - python ci/generate_tests_from_scenarios.py
@@ -405,18 +398,18 @@ pipelines:
 
 `reports/traceability_matrix.md` maps every requirement to its end-to-end result:
 
-| Requirement | Scenario | Test Case | Kane AI | Selenium | Status |
-|---|---|---|---|---|---|
-| Navigate to credit cards and view list | SC-001 | TC-001 | Passed | Passed | Green |
-| Use filters to refine results | SC-002 | TC-002 | Passed | Passed | Green |
-| Click card to view details | SC-003 | TC-003 | Failed | Flaky | Yellow |
-| View highlights without login | SC-004 | TC-004 | Passed | Passed | Green |
-| Relevant results for selected filter | SC-005 | TC-005 | Failed | Pending | Yellow |
+| Requirement | Scenario | Test Case | Kane AI Result | Status |
+|---|---|---|---|---|
+| Navigate to products section and view list | SC-001 | TC-001 | Passed | Green |
+| Use filters to refine product results | SC-002 | TC-002 | Passed | Green |
+| Click a product to view details | SC-003 | TC-003 | Passed | Green |
+| View highlights without login | SC-004 | TC-004 | Passed | Green |
+| Relevant results for selected filter | SC-005 | TC-005 | Failed | Yellow |
 
 `reports/release_recommendation.md` gives the final verdict:
 
 ```
-VERDICT: YELLOW — 3/5 requirements fully verified. SC-003 and SC-005 require investigation
+VERDICT: YELLOW — 4/5 requirements fully verified. SC-005 requires investigation
 before release. All other acceptance criteria confirmed on the live site.
 ```
 
@@ -426,10 +419,10 @@ before release. All other acceptance criteria confirmed on the live site.
 
 | Scenario | Test function | Acceptance criterion |
 |---|---|---|
-| SC-001 | `test_sc_001_navigate_to_credit_cards_and_view_list` | Navigate and view card list |
-| SC-002 | `test_sc_002_filter_cards_by_category` | Filter cards by category |
-| SC-003 | `test_sc_003_click_card_view_details` | Click card to view details |
-| SC-004 | `test_sc_004_card_highlights_visible_without_login` | Highlights visible without login |
+| SC-001 | `test_sc_001_navigate_to_products_and_view_list` | Navigate and view product list |
+| SC-002 | `test_sc_002_filter_products_by_category` | Filter products by category |
+| SC-003 | `test_sc_003_click_product_view_details` | Click product to view details |
+| SC-004 | `test_sc_004_product_highlights_visible_without_login` | Highlights visible without login |
 | SC-005 | `test_sc_005_relevant_results_for_selected_filter` | Relevant results per filter |
 
 ---
@@ -441,11 +434,11 @@ before release. All other acceptance criteria confirmed on the live site.
 
 ```bash
 git add requirements/search.txt
-git commit -m "feat: add requirement for card comparison table"
+git commit -m "feat: add requirement for product comparison"
 git push
 ```
 
-GitHub Actions automatically runs all 5 stages. New scenarios and Selenium tests are generated with no manual scripting.
+GitHub Actions automatically runs all 5 stages. New scenarios and Kane-wrapped tests are generated with no manual scripting.
 
 To run just the affected stages locally:
 
@@ -461,4 +454,4 @@ python ci/generate_tests_from_scenarios.py
 
 MIT — see [LICENSE](./LICENSE).
 
-Built with [Kane AI](https://lambdatest.com/kane-ai), [HyperExecute](https://lambdatest.com/hyperexecute), [Claude Code](https://claude.ai/code), and [Ollama](https://ollama.com) running [Gemma](https://ollama.com/library/gemma4).
+Built with [Kane AI](https://lambdatest.com/kane-ai), [HyperExecute](https://lambdatest.com/hyperexecute), and [Claude Code](https://claude.ai/code).

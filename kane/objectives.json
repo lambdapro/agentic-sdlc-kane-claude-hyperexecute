@@ -3,23 +3,23 @@
     "scenario_id": "SC-001",
     "test_case_id": "TC-001",
     "requirement_id": "AC-001",
-    "objective": "User can navigate to the product section of the site and view a list of available products",
+    "objective": "User can navigate to the products section of the site and view a list of available products",
     "url": "https://ecommerce-playground.lambdatest.io/",
     "timeout": 120,
     "max_steps": 15,
-    "last_run_status": "passed",
-    "last_run_date": "2026-04-28"
+    "last_run_status": "pending",
+    "last_run_date": "2026-04-29"
   },
   {
     "scenario_id": "SC-002",
     "test_case_id": "TC-002",
     "requirement_id": "AC-002",
-    "objective": "User can use filters to refine results",
+    "objective": "User can use filters (e.g., rewards, travel, cashback) to refine results",
     "url": "https://ecommerce-playground.lambdatest.io/",
     "timeout": 120,
     "max_steps": 15,
-    "last_run_status": "passed",
-    "last_run_date": "2026-04-28"
+    "last_run_status": "pending",
+    "last_run_date": "2026-04-29"
   },
   {
     "scenario_id": "SC-003",
@@ -29,8 +29,8 @@
     "url": "https://ecommerce-playground.lambdatest.io/",
     "timeout": 180,
     "max_steps": 20,
-    "last_run_status": "failed",
-    "last_run_date": "2026-04-28"
+    "last_run_status": "pending",
+    "last_run_date": "2026-04-29"
   },
   {
     "scenario_id": "SC-004",
@@ -40,8 +40,8 @@
     "url": "https://ecommerce-playground.lambdatest.io/",
     "timeout": 120,
     "max_steps": 15,
-    "last_run_status": "passed",
-    "last_run_date": "2026-04-28"
+    "last_run_status": "pending",
+    "last_run_date": "2026-04-29"
   },
   {
     "scenario_id": "SC-005",
@@ -52,6 +52,6 @@
     "timeout": 120,
     "max_steps": 15,
     "last_run_status": "pending",
-    "last_run_date": "2026-04-28"
+    "last_run_date": "2026-04-29"
   }
 ]
