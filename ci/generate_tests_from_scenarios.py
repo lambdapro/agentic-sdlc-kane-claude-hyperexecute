@@ -22,6 +22,7 @@ Each test runs a Kane CLI objective against the live site.
 import json
 import shutil
 import subprocess
+from pathlib import Path
 import pytest
 
 
@@ -45,6 +46,22 @@ def _run_kane(objective: str, url: str, timeout: int = 120) -> dict:
         "one_liner": result.stderr.strip() or "Kane CLI produced no parseable output",
         "link": "",
     }
+
+
+def _save_kane_result(requirement_id: str, scenario_id: str, test_case_id: str, result: dict) -> None:
+    Path("reports").mkdir(exist_ok=True)
+    record = {
+        "requirement_id": requirement_id,
+        "scenario_id": scenario_id,
+        "test_case_id": test_case_id,
+        "status": result.get("status", "failed"),
+        "link": result.get("link", ""),
+        "one_liner": result.get("one_liner", ""),
+        "duration": result.get("duration"),
+    }
+    Path(f"reports/kane_result_{scenario_id}.json").write_text(
+        json.dumps(record, indent=2), encoding="utf-8"
+    )
 
 '''
 
@@ -72,12 +89,14 @@ def build_test_function(scenario):
     url = scenario["kane_url"]
     timeout = 180 if scenario["id"] == "SC-003" else 120
 
+    test_case_id = scenario.get("test_case_id", "TC-000")
     body = (
         f'    result = _run_kane(\n'
         f'        "{objective}",\n'
         f'        "{url}",\n'
         f'        timeout={timeout},\n'
         f'    )\n'
+        f'    _save_kane_result("{scenario["requirement_id"]}", "{scenario["id"]}", "{test_case_id}", result)\n'
         f'    link = result.get("link", "")\n'
         f'    if link:\n'
         f'        print(f"\\nKane session: {{link}}")\n'

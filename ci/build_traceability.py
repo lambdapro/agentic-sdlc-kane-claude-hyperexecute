@@ -17,10 +17,10 @@ def parse_args():
 
 
 FUNCTION_NAMES = {
-    "SC-001": "test_sc_001_navigate_to_credit_cards_and_view_list",
-    "SC-002": "test_sc_002_filter_cards_by_category",
-    "SC-003": "test_sc_003_click_card_view_details",
-    "SC-004": "test_sc_004_card_highlights_visible_without_login",
+    "SC-001": "test_sc_001_navigate_to_products_and_view_list",
+    "SC-002": "test_sc_002_filter_products_by_category",
+    "SC-003": "test_sc_003_click_product_view_details",
+    "SC-004": "test_sc_004_product_highlights_visible_without_login",
     "SC-005": "test_sc_005_relevant_results_for_selected_filter",
 }
 
@@ -30,6 +30,18 @@ def load_json(path, default):
     if not file_path.exists():
         return default
     return json.loads(file_path.read_text(encoding="utf-8"))
+
+
+def load_kane_execution_results(reports_dir):
+    """Read per-test Kane result files written by the test suite."""
+    results = {}
+    for f in sorted(Path(reports_dir).glob("kane_result_SC-*.json")):
+        try:
+            item = json.loads(f.read_text(encoding="utf-8"))
+            results[item["scenario_id"]] = item
+        except Exception:
+            continue
+    return results
 
 
 def load_junit_results(path):
@@ -62,6 +74,8 @@ def main():
     kane_results = {
         item["requirement_id"]: item for item in load_json(args.kane_results, [])
     }
+    # Per-test Kane execution results saved by the test suite (primary source)
+    kane_execution = load_kane_execution_results(Path(args.pytest_junit).parent)
     junit_results = load_junit_results(args.pytest_junit)
     scenarios_by_requirement = {scenario["requirement_id"]: scenario for scenario in scenarios}
 
@@ -75,8 +89,14 @@ def main():
         scenario = scenarios_by_requirement.get(requirement["id"])
         test_case_id = scenario.get("test_case_id") if scenario else "n/a"
         scenario_id = scenario.get("id") if scenario else "n/a"
-        function_name = FUNCTION_NAMES.get(scenario_id, "")
-        selenium_result = junit_results.get(function_name, "not_run")
+        function_name = FUNCTION_NAMES.get(scenario_id, f"test_{scenario_id.lower().replace('-', '_')}")
+        # Kane execution result (saved per-test) is the primary source
+        kane_exec = kane_execution.get(scenario_id, {})
+        session_link = kane_exec.get("link", "")
+        if kane_exec:
+            selenium_result = kane_exec.get("status", "not_run")
+        else:
+            selenium_result = junit_results.get(function_name, "not_run")
         kane_result = kane_results.get(requirement["id"], {}).get("status", requirement.get("kane_status", "unknown"))
         if selenium_result != "not_run":
             overall = selenium_result
@@ -97,7 +117,8 @@ def main():
                 "test_case_id": test_case_id,
                 "kane_ai_result": kane_result,
                 "selenium_result": selenium_result,
-                "analysis_note": "" if selenium_result != "not_run" else "Overall falls back to Kane because Selenium did not run.",
+                "session_link": session_link,
+                "analysis_note": "" if selenium_result != "not_run" else "Test result not yet available.",
                 "overall": overall,
             }
         )
@@ -121,13 +142,14 @@ def main():
         f"- Requirements covered: {summary['requirements_covered']}/{summary['requirements_total']}",
         f"- Selenium pass rate: {summary['pass_rate']}% ({summary['passed']} passed, {summary['executed'] - summary['passed']} failed or skipped)",
         "",
-        "| Requirement ID | Acceptance Criterion | Scenario ID | Test Case ID | Kane AI Result | Selenium Result | Overall |",
-        "|---|---|---|---|---|---|---|",
+        "| Requirement ID | Acceptance Criterion | Scenario ID | Test Case ID | Kane Verify | Kane Execute | Session | Overall |",
+        "|---|---|---|---|---|---|---|---|",
     ]
 
     for row in rows:
+        link_cell = f"[view]({row['session_link']})" if row.get("session_link") else "-"
         lines.append(
-            f"| {row['requirement_id']} | {row['acceptance_criterion']} | {row['scenario_id']} | {row['test_case_id']} | {row['kane_ai_result']} | {row['selenium_result']} | {row['overall']} |"
+            f"| {row['requirement_id']} | {row['acceptance_criterion']} | {row['scenario_id']} | {row['test_case_id']} | {row['kane_ai_result']} | {row['selenium_result']} | {link_cell} | {row['overall']} |"
         )
 
     kane_only_issues = [row for row in rows if row["selenium_result"] == "passed" and row["kane_ai_result"] != "passed"]

@@ -7,6 +7,7 @@ Each test runs a Kane CLI objective against the live site.
 import json
 import shutil
 import subprocess
+from pathlib import Path
 import pytest
 
 
@@ -31,15 +32,32 @@ def _run_kane(objective: str, url: str, timeout: int = 120) -> dict:
         "link": "",
     }
 
+
+def _save_kane_result(requirement_id: str, scenario_id: str, test_case_id: str, result: dict) -> None:
+    Path("reports").mkdir(exist_ok=True)
+    record = {
+        "requirement_id": requirement_id,
+        "scenario_id": scenario_id,
+        "test_case_id": test_case_id,
+        "status": result.get("status", "failed"),
+        "link": result.get("link", ""),
+        "one_liner": result.get("one_liner", ""),
+        "duration": result.get("duration"),
+    }
+    Path(f"reports/kane_result_{scenario_id}.json").write_text(
+        json.dumps(record, indent=2), encoding="utf-8"
+    )
+
 @pytest.mark.scenario("SC-001")
 @pytest.mark.requirement("AC-001")
 def test_sc_001_navigate_to_products_and_view_list():
-    """SC-001: Navigate to products section and view available product list."""
+    """SC-001: Navigate to product catalog and view product list."""
     result = _run_kane(
-        "User can navigate to the products section of the site and view a list of available products",
+        "Go to ecommerce-playground.lambdatest.io, navigate to the product catalog, and verify that a list of products is displayed",
         "https://ecommerce-playground.lambdatest.io/",
         timeout=120,
     )
+    _save_kane_result("AC-001", "SC-001", "TC-001", result)
     link = result.get("link", "")
     if link:
         print(f"\nKane session: {link}")
@@ -48,12 +66,13 @@ def test_sc_001_navigate_to_products_and_view_list():
 @pytest.mark.scenario("SC-002")
 @pytest.mark.requirement("AC-002")
 def test_sc_002_filter_products_by_category():
-    """SC-002: Filter products by category."""
+    """SC-002: Apply a brand filter to narrow product results."""
     result = _run_kane(
-        "User can use filters (e.g., rewards, travel, cashback) to refine results",
-        "https://ecommerce-playground.lambdatest.io/",
+        "On ecommerce-playground.lambdatest.io go to the Phones category page and click the Apple brand filter in the left sidebar to filter the product list",
+        "https://ecommerce-playground.lambdatest.io/index.php?route=product/category&path=20",
         timeout=120,
     )
+    _save_kane_result("AC-002", "SC-002", "TC-002", result)
     link = result.get("link", "")
     if link:
         print(f"\nKane session: {link}")
@@ -62,12 +81,13 @@ def test_sc_002_filter_products_by_category():
 @pytest.mark.scenario("SC-003")
 @pytest.mark.requirement("AC-003")
 def test_sc_003_click_product_view_details():
-    """SC-003: Click a product to view details including price and description."""
+    """SC-003: Click a product to view its detail page."""
     result = _run_kane(
-        "User can click on a product to view details",
-        "https://ecommerce-playground.lambdatest.io/",
+        "On ecommerce-playground.lambdatest.io click on any product in the catalog to open its detail page and verify the product name and price are shown",
+        "https://ecommerce-playground.lambdatest.io/index.php?route=product/category&path=20",
         timeout=180,
     )
+    _save_kane_result("AC-003", "SC-003", "TC-003", result)
     link = result.get("link", "")
     if link:
         print(f"\nKane session: {link}")
@@ -76,12 +96,13 @@ def test_sc_003_click_product_view_details():
 @pytest.mark.scenario("SC-004")
 @pytest.mark.requirement("AC-004")
 def test_sc_004_product_highlights_visible_without_login():
-    """SC-004: View product highlights without logging in."""
+    """SC-004: Browse products and homepage without logging in."""
     result = _run_kane(
-        "User can see clear card comparison or highlights without logging in",
+        "Visit ecommerce-playground.lambdatest.io without logging in and verify that products or featured items are visible on the page",
         "https://ecommerce-playground.lambdatest.io/",
         timeout=120,
     )
+    _save_kane_result("AC-004", "SC-004", "TC-004", result)
     link = result.get("link", "")
     if link:
         print(f"\nKane session: {link}")
@@ -90,12 +111,13 @@ def test_sc_004_product_highlights_visible_without_login():
 @pytest.mark.scenario("SC-005")
 @pytest.mark.requirement("AC-005")
 def test_sc_005_relevant_results_for_selected_filter():
-    """SC-005: Search results are relevant to selected filters or criteria."""
+    """SC-005: Search for a product by name and see relevant results."""
     result = _run_kane(
-        "User receives relevant results based on selected filters or search criteria",
+        "On ecommerce-playground.lambdatest.io use the search bar to search for iPhone and verify that relevant product results are shown",
         "https://ecommerce-playground.lambdatest.io/",
         timeout=120,
     )
+    _save_kane_result("AC-005", "SC-005", "TC-005", result)
     link = result.get("link", "")
     if link:
         print(f"\nKane session: {link}")

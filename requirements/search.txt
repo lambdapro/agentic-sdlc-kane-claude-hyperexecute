@@ -1,39 +1,12 @@
-Title: Browse and search for available products
-
-As a potential customer
-I want to search and explore products on ecommerce-playground.lambdatest.io
-So that I can find a card that suits my needs
-
-Acceptance Criteria:
-User can navigate to the product section of the site
-User can view a list of available products
-User can use filters to refine results
-User can click on a product to view details
-User can see clear card comparison or highlights without logging in
-User receives relevant results based on selected filters or search criteria
-
----
-
-Title: Search for iPhone 17 products
-
-As a customer
-I want to search for the latest iPhone 17 on the eCommerce site
-So that I can see the pricing and availability
-
-Acceptance Criteria:
-User can search for "iphone 17" in the search bar
-User is presented with iPhone 17 product results
-User can view the price and specifications for iPhone 17
-
----
-
-Title: Add product to cart and view cart
+Title: Browse and search products on ecommerce playground
 
 As a shopper
-I want to add products to my cart on ecommerce-playground.lambdatest.io
-So that I can review my selections before purchasing
+I want to explore products on ecommerce-playground.lambdatest.io
+So that I can find and buy what I need
 
 Acceptance Criteria:
-User can add a product to the cart from the product listing page
-User can open the cart and see the added product with correct name and price
-User can update the quantity of an item in the cart
+User can navigate to the product catalog and see a list of products
+User can apply a brand filter from the sidebar to narrow product results
+User can click a product to open its detail page and see the name and price
+User can browse products and the homepage without logging in
+User can search for a product by name and see relevant results

@@ -25,7 +25,7 @@ testDiscovery:
   mode: dynamic
   command: cat reports/pytest_selection.txt
 
-testRunnerCommand: PYTHONPATH=. pytest "$test" -v --tb=short -s
+testRunnerCommand: PYTHONPATH=. pytest "$test" -v --tb=short -s --junitxml=reports/junit.xml
 
 mergeArtifacts: true
 uploadArtefacts:
