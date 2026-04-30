@@ -61,12 +61,18 @@ SELENIUM_BODIES = {
     assert len(products) > 0, "No products found on catalog page"''',
 
     "SC-002": '''\
-    driver.get("{url}")
+    driver.get("{url}index.php?route=product/category&path=20")
     wait = WebDriverWait(driver, 20)
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".product-thumb,.product-layout")))
+    driver.execute_script("window.scrollTo(0, 400)")
     apple_filter = wait.until(
-        EC.element_to_be_clickable((By.XPATH, "//label[contains(.,'Apple')]|//a[contains(.,'Apple') and ancestor::*[contains(@class,'sidebar') or contains(@class,'filter')]]"))
+        EC.presence_of_element_located((By.XPATH,
+            "//*[contains(normalize-space(text()),'Apple')]"
+            "[ancestor::*[contains(@class,'mz-filter') or contains(@class,'sidebar') or contains(@id,'filter') or contains(@class,'list-group')]]"
+        ))
     )
-    apple_filter.click()
+    driver.execute_script("arguments[0].scrollIntoView({{block:'center'}});", apple_filter)
+    driver.execute_script("arguments[0].click();", apple_filter)
     products = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".product-thumb,.product-layout")))
     assert len(products) > 0, "No products after applying Apple filter"''',
 
@@ -243,6 +249,18 @@ def run_hyperexecute() -> str:
 
 
 # ── Stage 6: Fetch results via MCP ────────────────────────────────────────
+
+# MCP responses wrap JSON in a markdown code block: ```json\n{...}\n```
+_JSON_BLOCK_RE = re.compile(r"```json\s*([\s\S]*?)\s*```")
+
+
+def _parse_mcp_text(text: str) -> object:
+    """Parse JSON from an MCP response, stripping any markdown code fence."""
+    m = _JSON_BLOCK_RE.search(text)
+    candidate = m.group(1) if m else text.strip()
+    return json.loads(candidate)
+
+
 async def fetch_and_save_mcp_results(job_id: str) -> None:
     if not job_id:
         print("[mcp] no job_id — writing empty api_details.json")
@@ -258,59 +276,66 @@ async def fetch_and_save_mcp_results(job_id: str) -> None:
                 await session.initialize()
 
                 # Poll until job is no longer running (max 15 min)
-                job_info: dict = {}
+                # Response structure: { "jobInfo": { "status": "...", ... } }
+                job_data: dict = {}
+                job_inner: dict = {}
                 for attempt in range(30):
                     raw = await session.call_tool("getHyperExecuteJobInfo", {"jobId": job_id})
                     text = raw.content[0].text if raw.content else "{}"
                     try:
-                        job_info = json.loads(text)
-                    except json.JSONDecodeError:
-                        job_info = {}
-                    status = job_info.get("status", "unknown")
+                        job_data  = _parse_mcp_text(text)
+                        job_inner = job_data.get("jobInfo") or job_data.get("data") or job_data
+                    except (json.JSONDecodeError, AttributeError):
+                        job_inner = {}
+                    status = job_inner.get("status", "unknown")
                     print(f"[mcp] attempt {attempt+1} — job status: {status}")
                     if status not in ("running", "initiated", "queued"):
                         break
                     await asyncio.sleep(30)
 
+                # Sessions response: { "sessions": { "data": [ {sessionID, name, status, ...} ] } }
                 raw_sessions = await session.call_tool("getHyperExecuteJobSessions", {"jobId": job_id})
-                sessions_text = raw_sessions.content[0].text if raw_sessions.content else "[]"
+                sessions_text = raw_sessions.content[0].text if raw_sessions.content else "{}"
                 try:
-                    sessions_list = json.loads(sessions_text)
-                except json.JSONDecodeError:
+                    sessions_data = _parse_mcp_text(sessions_text)
+                    sessions_list = (
+                        sessions_data.get("sessions", {}).get("data")
+                        or sessions_data.get("data")
+                        or (sessions_data if isinstance(sessions_data, list) else [])
+                    )
+                except (json.JSONDecodeError, AttributeError):
                     sessions_list = []
 
-                _write_api_details(job_info, sessions_list, job_id)
+                _write_api_details(job_inner, sessions_list, job_id)
 
     except Exception as exc:
         print(f"[mcp] connection failed: {exc} — writing empty api_details.json")
         _write_api_details({}, [], job_id)
 
 
-def _write_api_details(job_info: dict, sessions_list: list, job_id: str) -> None:
+def _write_api_details(job_inner: dict, sessions_list: list, job_id: str) -> None:
+    # job_inner is the inner jobInfo object: { status, jobId, jobLink, totalTasks, ... }
     he_summary = {
-        "job_id":                job_info.get("jobId") or job_id,
-        "job_link":              job_info.get("jobLink", ""),
-        "status":                job_info.get("status", "unknown"),
-        "total_tasks":           job_info.get("totalTasks", 0),
-        "selenium_reports_link": job_info.get("seleniumReportsLink", ""),
-        "runtime_logs_link":     job_info.get("runtimeLogsLink", ""),
+        "job_id":                job_inner.get("jobId") or job_id,
+        "job_link":              job_inner.get("jobLink") or f"https://hyperexecute.lambdatest.com/hyperexecute/task?jobId={job_id}",
+        "status":                job_inner.get("status", "unknown"),
+        "total_tasks":           job_inner.get("totalTasks", len(sessions_list)),
+        "selenium_reports_link": job_inner.get("seleniumReportsLink", ""),
+        "runtime_logs_link":     job_inner.get("runtimeLogsLink", ""),
     }
 
-    tasks_raw = (
-        sessions_list if isinstance(sessions_list, list)
-        else sessions_list.get("tasks") or sessions_list.get("sessions") or []
-    )
     he_tasks = []
-    for task in tasks_raw:
-        session_id   = task.get("sessionID") or task.get("testID") or task.get("id", "")
+    for item in sessions_list:
+        # Sessions use sessionID or testID for the LambdaTest automation link
+        session_id   = item.get("sessionID") or item.get("testID") or item.get("id", "")
         session_link = (
             f"https://automation.lambdatest.com/test?testID={session_id}"
             if session_id else ""
         )
         he_tasks.append({
-            "name":         task.get("name", ""),
-            "task_id":      task.get("taskID") or task.get("id", ""),
-            "status":       task.get("status", "unknown"),
+            "name":         item.get("name", ""),
+            "task_id":      item.get("taskID") or item.get("id", ""),
+            "status":       item.get("status", "unknown"),
             "session_link": session_link,
         })
 

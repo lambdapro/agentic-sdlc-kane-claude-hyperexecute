@@ -29,11 +29,19 @@ def test_sc_002_filter_products_by_category(driver):
     """SC-002: Applied Apple filter, 3 products shown."""
     driver.get("https://ecommerce-playground.lambdatest.io/index.php?route=product/category&path=20")
     wait = WebDriverWait(driver, 20)
+    # Wait for products to load before interacting with sidebar
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".product-thumb,.product-layout")))
+    driver.execute_script("window.scrollTo(0, 400)")
+    # Find Apple in sidebar brand/manufacturer filter; use JS click to avoid interception
     apple_filter = wait.until(
-        EC.element_to_be_clickable((By.XPATH, "//label[contains(., 'Apple')] | //a[contains(., 'Apple') and ancestor::*[contains(@class,'sidebar') or contains(@class,'filter') or contains(@class,'mz-filter')]]"))
+        EC.presence_of_element_located((By.XPATH,
+            "//*[contains(normalize-space(text()),'Apple')]"
+            "[ancestor::*[contains(@class,'mz-filter') or contains(@class,'sidebar') or contains(@id,'filter') or contains(@class,'list-group')]]"
+        ))
     )
-    apple_filter.click()
+    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", apple_filter)
+    driver.execute_script("arguments[0].click();", apple_filter)
     products = wait.until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".product-thumb, .product-layout"))
+        EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".product-thumb,.product-layout"))
     )
     assert len(products) > 0, "No products after applying Apple filter"
