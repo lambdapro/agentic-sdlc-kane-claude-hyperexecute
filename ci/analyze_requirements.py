@@ -20,7 +20,7 @@ def build_name():
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--requirements", default="requirements/search.txt")
+    parser.add_argument("--requirements", default="requirements")
     parser.add_argument("--output", default="requirements/analyzed_requirements.json")
     parser.add_argument("--kane-results", default="reports/kane_results.json")
     parser.add_argument("--skip-kane", action="store_true")

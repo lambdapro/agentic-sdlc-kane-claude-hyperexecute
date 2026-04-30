@@ -1,0 +1,9 @@
+Title: Shopping cart on ecommerce playground
+
+As a shopper
+I want to manage items in my cart
+So that I can review my selection before checkout
+
+Acceptance Criteria:
+User can add a product to the cart from the product detail page and see the cart item count update
+User can open the cart and see the list of added items with their names and prices

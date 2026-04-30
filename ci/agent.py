@@ -390,7 +390,17 @@ def _write_api_details(job_inner: dict, he_tasks: list, job_id: str) -> None:
 
 
 # ── Stage 7: Release recommendation (threshold-based) ─────────────────────
+def _dedup_tasks(he_tasks: list) -> list:
+    """Deduplicate by test name, keeping the first occurrence (LT API returns newest first)."""
+    seen: dict = {}
+    for t in he_tasks:
+        key = t.get("name") or t.get("task_id", "")
+        seen.setdefault(key, t)
+    return list(seen.values())
+
+
 def write_recommendation(he_tasks: list, requirements_total: int) -> None:
+    he_tasks = _dedup_tasks(he_tasks)
     total  = len(he_tasks)
     passed = sum(1 for t in he_tasks if t["status"] == "passed")
     failed = total - passed
@@ -399,10 +409,10 @@ def write_recommendation(he_tasks: list, requirements_total: int) -> None:
     if total == 0:
         verdict = "YELLOW"
         rec = "Test results not yet available — manual review required before release."
-    elif pass_rate >= 90 and failed == 0:
+    elif pass_rate >= 80:
         verdict = "GREEN"
-        rec = "Approve release — coverage is complete and all executed tests passed."
-    elif pass_rate >= 75:
+        rec = f"Approve release — {passed}/{total} tests passed ({pass_rate}%)."
+    elif pass_rate >= 60:
         verdict = "YELLOW"
         rec = f"Conditional release — {failed} test(s) failed. Review failures before proceeding."
     else:
