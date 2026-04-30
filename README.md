@@ -5,34 +5,30 @@
 
 > **Open source under the MIT License.** Fork it, adapt it, ship it.
 
-An end-to-end **Agentic Software Testing Lifecycle (STLC)** where plain-English requirements drive every stage of QA — from requirement analysis to parallel cloud execution and a final release verdict. Kane AI CLI analyzes and verifies requirements against the live site; Selenium WebDriver tests are generated automatically and executed at scale on LambdaTest Grid via HyperExecute.
+An end-to-end **Agentic Software Testing Lifecycle (STLC)** where plain-English requirements drive every stage of QA — from requirement analysis to parallel cloud execution and a final release verdict.
+
+**Kane AI** creates and runs functional test cases, verifying each acceptance criterion against the live site in real browser sessions. **HyperExecute** then executes those same tests as a full regression suite at scale, fanning them out across parallel cloud VMs simultaneously.
 
 ---
 
-## How the Agentic STLC works — 7 steps
+## How the Agentic STLC works — 5 stages
 
 > Commit your requirements. Everything else is automatic.
 
-**Step 1 — Commit requirements and trigger the pipeline**
-Edit `requirements/search.txt` in plain English, then `git push`. GitHub Actions detects the change and starts the pipeline immediately — no manual trigger needed.
+**Stage 1 — Kane AI analyzes and verifies each acceptance criterion (functional)**
+`ci/analyze_requirements.py` runs `kane-cli run` on each acceptance criterion against the live site. Kane AI drives a real browser, confirms the behaviour is observable, and records a pass/fail result with a session link per criterion. These are your **functional test cases** — created and executed entirely by Kane AI with no human scripting.
 
-**Step 2 — Kane AI CLI verifies each acceptance criterion**
-`ci/analyze_requirements.py` runs `kane-cli run` on each criterion against the live site. Kane AI drives a real browser, verifies the behaviour is achievable, and records a pass/fail result with a session link per criterion.
+**Stage 2 — Scenario pool is synchronized**
+The orchestrator diffs the verified requirements against `scenarios/scenarios.json`. New requirements produce new scenario records; changed requirements mark their scenario as updated; removed requirements are deprecated. Nothing is deleted — the full history is preserved.
 
-**Step 3 — Scenario pool is synchronized**
-`ci/manage_scenarios.py` diffs the verified requirements against the existing `scenarios/scenarios.json`. New requirements get new scenario records. Changed requirements update their scenario. Requirements that no longer exist are deprecated. Nothing is deleted — the full history is preserved.
+**Stage 3 — Selenium regression tests are generated**
+The orchestrator reads the scenario pool and writes a pytest test file (`tests/selenium/test_products.py`). Each scenario becomes one Selenium test function mapped back to its acceptance criterion — ready for regression execution at scale.
 
-**Step 4 — Selenium automation scripts are generated**
-`ci/generate_tests_from_scenarios.py` reads the scenario pool and writes a pytest test file (`tests/selenium/test_products.py`). Each scenario becomes one test function with site-specific Selenium actions derived from its steps and URL.
+**Stage 4 — HyperExecute runs regression at scale**
+The CI job downloads the HyperExecute CLI and submits the generated Selenium tests. HyperExecute fans them out across multiple cloud VMs simultaneously. Each VM runs one pytest node, opens a real browser on LambdaTest Grid via `conftest.py`, and uploads its artifacts on completion. This is the **regression at scale** phase — the same functional scenarios Kane AI verified, now stress-tested in parallel across browsers and platforms.
 
-**Step 5 — Hub address and capabilities are injected**
-`tests/selenium/conftest.py` provides a `driver` fixture that connects every test to the LambdaTest Selenium Grid (`hub.lambdatest.com/wd/hub`) with the correct capabilities — platform, browser, video recording, network logs — so no test file contains credentials or infrastructure details.
-
-**Step 6 — HyperExecute CLI triggers the suite in parallel**
-The CI job downloads the HyperExecute CLI and submits the selected tests. HyperExecute fans them out across multiple cloud VMs simultaneously. Each VM runs one pytest node, opens one real browser session on LambdaTest Grid, and uploads its artifacts on completion.
-
-**Step 7 — Pipeline reports results for every phase with links**
-`ci/build_traceability.py` maps every result back to its requirement. `ci/release_recommendation.py` emits a GREEN / YELLOW / RED verdict. `ci/write_github_summary.py` writes a single GitHub Actions summary covering all 7 stages — with clickable links to the HyperExecute job, per-test LambdaTest Automate session videos, and Kane AI verification sessions.
+**Stage 5 — Full traceability report with Functional + Regression results**
+`ci/build_traceability.py` maps every result back to its requirement, combining Kane AI functional results with HyperExecute regression results in a single traceability matrix. `ci/write_github_summary.py` writes a GitHub Actions summary with clickable links to the HyperExecute job, per-test LambdaTest Automate session videos, and Kane AI verification sessions. A GREEN / YELLOW / RED release verdict is generated from the combined data.
 
 ---
 
@@ -40,11 +36,11 @@ The CI job downloads the HyperExecute CLI and submits the selected tests. HyperE
 
 | Tool | Role in the pipeline |
 |---|---|
-| **Kane CLI** (`@testmuai/kane-cli`) | AI browser agent — verifies each acceptance criterion against the live site in Stage 1; not used during test execution |
-| **Selenium WebDriver** | Test executor — each generated test drives a real browser on LambdaTest Grid via `webdriver.Remote` |
-| **HyperExecute CLI** | Cloud parallel test runner — fans out pytest Selenium tests across multiple VMs simultaneously |
-| **pytest** | Test orchestration framework — runs Selenium tests, captures pass/fail per node, uploads artifacts |
-| **Python CI Scripts** | Stage orchestrators — synchronize requirements, scenarios, generate test code, and build reports |
+| **Kane AI** (`@testmuai/kane-cli`) | Functional testing — verifies each acceptance criterion against the live site, creates functional test cases with real browser sessions, records pass/fail with session links |
+| **HyperExecute CLI** | Regression at scale — fans out the generated Selenium tests across parallel cloud VMs so all scenarios run simultaneously, not sequentially |
+| **Selenium WebDriver** | Regression executor — each generated test drives a real browser on LambdaTest Grid via `webdriver.Remote` |
+| **pytest** | Test orchestration framework — runs Selenium tests, captures pass/fail per node, uploads JUnit + HTML artifacts |
+| **Python CI Scripts** | Stage orchestrators — synchronize requirements, scenarios, generate test code, fetch results, and build reports |
 
 ---
 
@@ -65,11 +61,12 @@ git push
 GitHub Actions picks up the push and runs the full pipeline:
 
 ```
-Stage 1: Analyze   → Kane AI verifies each acceptance criterion on the live site
-Stage 2: Manage    → Diffs scenarios.json, adds new, updates changed, deprecates removed
-Stage 3: Generate  → Writes Selenium WebDriver pytest tests for every new/changed scenario
-Stage 4: Execute   → HyperExecute fans out tests; each VM opens a real browser on LambdaTest Grid
-Stage 5: Report    → Traceability matrix + GREEN / YELLOW / RED release recommendation
+Stage 1: Kane AI   → Verifies each acceptance criterion (functional) — real browser, session link per criterion
+Stage 2: Scenarios → Diffs scenarios.json, adds new, updates changed, deprecates removed
+Stage 3: Generate  → Writes Selenium regression tests for every scenario
+Stage 4: Regress   → HyperExecute fans out all tests in parallel across cloud VMs
+Stage 5: Report    → Traceability matrix combining Kane AI (functional) + HyperExecute (regression) results
+                     → GREEN / YELLOW / RED release verdict
 ```
 
 No human writes a single test. No one maps a requirement to code. The pipeline does it all.
@@ -90,13 +87,16 @@ No human writes a single test. No one maps a requirement to code. The pipeline d
 
 ## Pipeline Automation
 
-The `.github/workflows/agentic-stlc.yml` workflow executes the following Python-driven stages:
+The `.github/workflows/agentic-stlc.yml` workflow runs two jobs:
 
-1. **Stage 1 - Analyze Requirements**: `ci/analyze_requirements.py` runs `kane-cli run` against the live site to verify each acceptance criterion and records a session link per criterion.
-2. **Stage 2 - Manage Scenarios**: `ci/manage_scenarios.py` synchronizes the scenario catalog — new requirements produce new scenarios, changed requirements mark their scenario as updated, removed requirements are deprecated.
-3. **Stage 3 - Generate Tests**: `ci/generate_tests_from_scenarios.py` generates Selenium WebDriver pytest tests — one function per scenario using site-specific locators and WebDriverWait assertions.
-4. **Stage 4 - Execution**: Selected tests are submitted to **HyperExecute**; each VM runs `pytest "$test"` which connects to LambdaTest Selenium Grid via the `driver` fixture in `conftest.py`.
-5. **Stage 5 - Reporting**: Requirement traceability matrix links every result to its acceptance criterion; a GREEN / YELLOW / RED release recommendation is generated from actual test data.
+**Job 1 — `analyze` (Stage 1):** `ci/analyze_requirements.py` runs `kane-cli run` against the live site for each acceptance criterion. Kane AI drives a real browser session, confirms the criterion is observable, and records pass/fail + a session link. These are the **functional test results**.
+
+**Job 2 — `orchestrate` (Stages 2-5):** `ci/agent.py` runs the remaining stages end-to-end:
+
+1. **Stage 2 - Scenario Sync**: Diffs `scenarios/scenarios.json` against analyzed requirements — new scenarios added, changed ones updated, removed ones deprecated.
+2. **Stage 3 - Test Generation**: Generates `tests/selenium/test_products.py` — one pytest function per scenario with site-specific Selenium actions and WebDriverWait assertions.
+3. **Stage 4 - Regression at Scale (HyperExecute)**: Submits selected tests to HyperExecute. Tests fan out across parallel cloud VMs; each VM runs one `pytest "$test"` node connected to LambdaTest Selenium Grid via `conftest.py`.
+4. **Stage 5 - Traceability + Verdict**: `ci/build_traceability.py` maps Kane AI functional results and HyperExecute regression results to every requirement. `ci/write_github_summary.py` produces the GitHub Actions summary with a combined **Functional + Regression Result** column per requirement and a GREEN / YELLOW / RED release verdict.
 
 ---
 
@@ -193,7 +193,7 @@ In your fork: **Settings > Secrets and variables > Actions > New repository secr
 
 ## GitHub Actions — automatic trigger
 
-Push any change to `requirements/search.txt` and the full 5-stage pipeline runs automatically.
+Push any change to `requirements/search.txt` and the full pipeline runs automatically.
 
 ```bash
 vim requirements/search.txt     # add or edit a requirement
@@ -210,7 +210,7 @@ Watch it run: **GitHub > Actions**
 
 ### Manual trigger
 
-Go to **Actions > Pure CI Pipeline > Run workflow**. Set `full_run` to `true` to run all scenarios (not just changed ones).
+Go to **Actions > Agentic STLC Pipeline > Run workflow**. Set `full_run` to `true` to run all scenarios (not just changed ones).
 
 ---
 
@@ -422,15 +422,15 @@ pipelines:
 
 ## Traceability matrix (auto-generated)
 
-`reports/traceability_matrix.md` maps every requirement to its end-to-end result:
+`reports/traceability_matrix.md` maps every requirement to its end-to-end result, combining Kane AI functional verification with HyperExecute regression execution:
 
-| Requirement | Scenario | Test Case | Kane AI Result | Status |
-|---|---|---|---|---|
-| Navigate to products section and view list | SC-001 | TC-001 | Passed | Green |
-| Use filters to refine product results | SC-002 | TC-002 | Passed | Green |
-| Click a product to view details | SC-003 | TC-003 | Passed | Green |
-| View highlights without login | SC-004 | TC-004 | Passed | Green |
-| Relevant results for selected filter | SC-005 | TC-005 | Failed | Yellow |
+| Requirement | Scenario | Test Case | Kane AI (Functional) | HyperExecute (Regression) | Functional + Regression Result |
+|---|---|---|---|---|---|
+| Navigate to products section and view list | SC-001 | TC-001 | ✅ passed | ✅ passed | ✅ passed |
+| Use filters to refine product results | SC-002 | TC-002 | ✅ passed | ✅ passed | ✅ passed |
+| Click a product to view details | SC-003 | TC-003 | ✅ passed | ✅ passed | ✅ passed |
+| View highlights without login | SC-004 | TC-004 | ✅ passed | ✅ passed | ✅ passed |
+| Relevant results for selected filter | SC-005 | TC-005 | ✅ passed | ❌ failed | ❌ failed |
 
 `reports/release_recommendation.md` gives the final verdict:
 
@@ -464,7 +464,7 @@ git commit -m "feat: add requirement for product comparison"
 git push
 ```
 
-GitHub Actions automatically runs all 5 stages. New scenarios and Selenium tests are generated with no manual scripting.
+GitHub Actions automatically runs the full pipeline. Kane AI verifies the new criterion (functional), the orchestrator generates the regression test, and HyperExecute runs it at scale — no manual scripting.
 
 To run just the affected stages locally:
 

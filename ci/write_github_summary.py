@@ -62,7 +62,13 @@ def main():
     api_details = load_json("reports/api_details.json", {})
 
     he_api = api_details.get("he_summary", {})
-    he_tasks_api = api_details.get("he_tasks", [])
+    # Deduplicate by test name: LT API returns newest session first, so the first
+    # occurrence of each name is the latest result (e.g. after a retry).
+    _seen_he: dict = {}
+    for _t in api_details.get("he_tasks", []):
+        _key = _t.get("name") or _t.get("task_id", "")
+        _seen_he.setdefault(_key, _t)
+    he_tasks_api = list(_seen_he.values())
     kane_sessions_api = {s["requirement_id"]: s for s in api_details.get("kane_sessions", [])}
 
     # ── Classify requirements ──────────────────────────────────────────────
@@ -246,17 +252,43 @@ def main():
         emit(f"| Runtime logs | [View logs ↗]({he_runtime_link}) |")
     emit("")
 
+    # ── HyperExecute Execution Report (before traceability) ───────────────
+    emit("## Regression on HyperExecute")
+    emit("")
+    if he_tasks_api:
+        he_run_passed = sum(1 for t in he_tasks_api if t["status"] == "passed")
+        he_run_failed = len(he_tasks_api) - he_run_passed
+        emit(
+            f"**{he_run_passed}/{len(he_tasks_api)}** tests passed on HyperExecute "
+            f"({he_run_failed} failed)."
+        )
+        emit("")
+        emit("| Test | Status | Session |")
+        emit("|---|---|---|")
+        for task in he_tasks_api:
+            status_icon = "✅" if task["status"] == "passed" else "❌"
+            session = f"[View session]({task['session_link']})" if task.get("session_link") else "—"
+            emit(f"| `{task['name'] or task['task_id']}` | {status_icon} {task['status']} | {session} |")
+        emit("")
+    elif he_job_link:
+        emit(f"No per-test data available yet — [view job on HyperExecute ↗]({he_job_link})")
+        emit("")
+    else:
+        emit("_No HyperExecute execution data available._")
+        emit("")
+
     # ── Stage 5: Traceability ──────────────────────────────────────────────
     emit("## Stage 5 · Results with Full Traceability")
     emit("")
     emit(
         f"Every test result is traced back to its requirement. "
-        f"**{passed}/{executed}** Selenium tests passed ({pass_rate}% pass rate)."
+        f"Functional cases are verified by **Kane AI**; regression at scale is executed by **HyperExecute**. "
+        f"**{passed}/{executed}** regression tests passed ({pass_rate}% pass rate)."
     )
     emit("")
 
     if trace_rows:
-        emit("| Req | Acceptance Criterion | Scenario | Test Case | Kane AI | What Kane Saw | Result |")
+        emit("| Req | Acceptance Criterion | Scenario | Test Case | Kane AI | What Kane Saw | Functional + Regression Result |")
         emit("|---|---|---|---|---|---|---|")
         for row in trace_rows:
             kane = row.get("kane_ai_result", "unknown")
@@ -300,31 +332,6 @@ def main():
         emit("**Requirements not yet covered by Selenium:**")
         for req in untested:
             emit(f"- ⚠️ `{req}`")
-        emit("")
-
-    # ── HyperExecute Execution Report ─────────────────────────────────────
-    emit("## Regression on HyperExecute")
-    emit("")
-    if he_tasks_api:
-        he_run_passed = sum(1 for t in he_tasks_api if t["status"] in ("passed",))
-        he_run_failed = len(he_tasks_api) - he_run_passed
-        emit(
-            f"**{he_run_passed}/{len(he_tasks_api)}** tests passed on HyperExecute "
-            f"({he_run_failed} failed)."
-        )
-        emit("")
-        emit("| Test | Status | Session |")
-        emit("|---|---|---|")
-        for task in he_tasks_api:
-            status_icon = "✅" if task["status"] == "passed" else "❌"
-            session = f"[View session]({task['session_link']})" if task.get("session_link") else "—"
-            emit(f"| `{task['name'] or task['task_id']}` | {status_icon} {task['status']} | {session} |")
-        emit("")
-    elif he_job_link:
-        emit(f"No per-test data available yet — [view job on HyperExecute ↗]({he_job_link})")
-        emit("")
-    else:
-        emit("_No HyperExecute execution data available._")
         emit("")
 
     # ── Release Recommendation ─────────────────────────────────────────────
