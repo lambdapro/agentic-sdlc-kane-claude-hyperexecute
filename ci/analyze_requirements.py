@@ -77,7 +77,7 @@ def run_kane(description):
     ws_endpoint = f"wss://{username}:{access_key}@cdp.lambdatest.com/playwright"
     command = [
         "kane-cli", "run", description,
-        "--url", TARGET_URL,
+        TARGET_URL,
         "--username", username,
         "--access-key", access_key,
         "--ws-endpoint", ws_endpoint,
