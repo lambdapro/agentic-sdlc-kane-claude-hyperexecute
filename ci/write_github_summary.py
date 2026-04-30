@@ -226,20 +226,8 @@ def main():
     emit("")
 
     he_total = he_api.get("total_tasks") or len(selected)
-    he_failed_api = he_api.get("failed_tasks") # Initialize he_failed_api
-    he_passed_api = he_api.get("passed_tasks") # Initialize he_passed_api here to prevent UnboundLocalError
-
-    # Ensure summary metrics are consistent with actual execution data for he_failed_api
-    if he_failed_api is None:
-        if executed > 0:
-            he_failed_api = failed_count
-        else:
-            he_failed_api = he_total if he_total > 0 else 0 # Default to 0 if no tasks
-
-    # Ensure summary metrics are consistent with actual execution data for he_passed_api
-    if he_passed_api is None:
-        he_passed_api = passed if executed > 0 else 0 # Default to 0 if no tasks
-
+    he_passed_api = passed if executed > 0 else (he_api.get("passed_tasks") or 0)
+    he_failed_api = (he_total - he_passed_api) if he_total else (he_api.get("failed_tasks") or 0)
     he_status = he_api.get("status", "unknown")
 
     emit("| Metric | Value |")
@@ -257,17 +245,6 @@ def main():
     if he_runtime_link:
         emit(f"| Runtime logs | [View logs ↗]({he_runtime_link}) |")
     emit("")
-
-    if he_tasks_api:
-        emit("**Per-test results from HyperExecute API:**")
-        emit("")
-        emit("| Test | Status | Session |")
-        emit("|---|---|---|")
-        for task in he_tasks_api:
-            status_icon = "✅" if task["status"] in ("passed", "completed") else "❌"
-            session = f"[View session]({task['session_link']})" if task.get("session_link") else "—"
-            emit(f"| `{task['name'] or task['task_id']}` | {status_icon} {task['status']} | {session} |")
-        emit("")
 
     # ── Stage 5: Traceability ──────────────────────────────────────────────
     emit("## Stage 5 · Results with Full Traceability")
@@ -325,6 +302,31 @@ def main():
             emit(f"- ⚠️ `{req}`")
         emit("")
 
+    # ── HyperExecute Execution Report ─────────────────────────────────────
+    emit("## HyperExecute Execution Report")
+    emit("")
+    if he_tasks_api:
+        he_run_passed = sum(1 for t in he_tasks_api if t["status"] in ("passed",))
+        he_run_failed = len(he_tasks_api) - he_run_passed
+        emit(
+            f"**{he_run_passed}/{len(he_tasks_api)}** tests passed on HyperExecute "
+            f"({he_run_failed} failed)."
+        )
+        emit("")
+        emit("| Test | Status | Session |")
+        emit("|---|---|---|")
+        for task in he_tasks_api:
+            status_icon = "✅" if task["status"] == "passed" else "❌"
+            session = f"[View session]({task['session_link']})" if task.get("session_link") else "—"
+            emit(f"| `{task['name'] or task['task_id']}` | {status_icon} {task['status']} | {session} |")
+        emit("")
+    elif he_job_link:
+        emit(f"No per-test data available yet — [view job on HyperExecute ↗]({he_job_link})")
+        emit("")
+    else:
+        emit("_No HyperExecute execution data available._")
+        emit("")
+
     # ── Release Recommendation ─────────────────────────────────────────────
     emit("## Release Recommendation")
     emit("")
@@ -337,7 +339,7 @@ def main():
     emit(
         f"- Requirements covered: **{trace_summary.get('requirements_covered', '?')}/{trace_summary.get('requirements_total', '?')}**"
     )
-    emit(f"- Pass rate: **{pass_rate}%** ({passed} passed, {failed_count} failed)")
+    emit(f"- HyperExecute pass rate: **{pass_rate}%** ({passed} passed, {failed_count} failed)")
     if run_url:
         emit(f"- Full run details: {run_url}")
     emit("")

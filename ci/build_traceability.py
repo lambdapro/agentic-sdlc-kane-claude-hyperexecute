@@ -44,6 +44,30 @@ def load_kane_execution_results(reports_dir):
     return results
 
 
+def load_he_task_results(api_details_path="reports/api_details.json"):
+    """
+    Build a function-name → {status, session_link} map from HyperExecute API data.
+    This is the most reliable source for CI runs where conftest files may not reach
+    the Actions runner.
+    """
+    p = Path(api_details_path)
+    if not p.exists():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    results = {}
+    for task in data.get("he_tasks", []):
+        name = task.get("name", "")
+        if name:
+            results[name] = {
+                "status": task.get("status", "unknown"),
+                "session_link": task.get("session_link", ""),
+            }
+    return results
+
+
 def load_junit_results(path):
     file_path = Path(path)
     if not file_path.exists():
@@ -76,6 +100,7 @@ def main():
     }
     kane_execution = load_kane_execution_results(Path(args.pytest_junit).parent)
     junit_results = load_junit_results(args.pytest_junit)
+    he_task_results = load_he_task_results()
     scenarios_by_requirement = {scenario["requirement_id"]: scenario for scenario in scenarios}
 
     rows = []
@@ -90,13 +115,21 @@ def main():
         scenario_id = scenario.get("id") if scenario else "n/a"
         function_name = FUNCTION_NAMES.get(scenario_id, f"test_{scenario_id.lower().replace('-', '_')}")
 
-        # Selenium execution result from conftest fixture (primary source)
+        # Selenium result priority:
+        # 1. conftest-written kane_result_SC-*.json (local runs, most precise)
+        # 2. HyperExecute API task data from api_details.json (CI runs on HE)
+        # 3. junit.xml (last resort)
         kane_exec = kane_execution.get(scenario_id, {})
         selenium_session_link = kane_exec.get("link", "")
         if kane_exec:
             selenium_result = kane_exec.get("status", "not_run")
         else:
-            selenium_result = junit_results.get(function_name, "not_run")
+            he_task = he_task_results.get(function_name, {})
+            if he_task:
+                selenium_result = he_task.get("status", "not_run")
+                selenium_session_link = he_task.get("session_link", "")
+            else:
+                selenium_result = junit_results.get(function_name, "not_run")
 
         # analyzed_requirements.json is the canonical Stage 1 source.
         # kane_results.json is supplemental; only use when kane_status is absent
