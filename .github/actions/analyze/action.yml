@@ -69,8 +69,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.npm
-        key: npm-kane-${{ runner.os }}-${{ inputs.node-version }}-v2
-        restore-keys: npm-kane-${{ runner.os }}-
+        key: npm-kane-${{ runner.os }}-${{ inputs.node-version }}-v3
 
     - name: "Cache pip"
       uses: actions/cache@v4
@@ -94,8 +93,8 @@ runs:
       if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo-mode != 'true'
       shell: bash
       run: |
-        npm install -g @testmuai/kane-cli --force
-        npm install -g google-protobuf@^6 --force
+        npm cache clean --force
+        npm install -g @testmuai/kane-cli
 
     - name: "Configure Kane CLI"
       if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo-mode != 'true' && inputs.kane-project-id != ''
@@ -142,8 +141,8 @@ runs:
       if: steps.kane-cache.outputs.cache-hit == 'true' && steps.validate-cache.outputs.cache_valid == 'false' && inputs.demo-mode != 'true'
       shell: bash
       run: |
-        npm install -g @testmuai/kane-cli --force
-        npm install -g google-protobuf@^6 --force
+        npm cache clean --force
+        npm install -g @testmuai/kane-cli
 
     - name: "Run KaneAI (live verification)"
       if: (steps.kane-cache.outputs.cache-hit != 'true' || steps.validate-cache.outputs.cache_valid == 'false') && inputs.demo-mode != 'true'
