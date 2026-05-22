@@ -2,12 +2,12 @@
   {
     "scenario_id": "SC-001",
     "test_case_id": "TC-001",
-    "objective": "Navigate to product_id=28 — click Add to Cart — verify cart icon count updates to 1. Stop once cart count is confirmed."
+    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart (not Out Of Stock) — verify cart icon count increments to 1. Stop immediately once cart count updated."
   },
   {
     "scenario_id": "SC-002",
     "test_case_id": "TC-002",
-    "objective": "Navigate to product_id=28 — click Add to Cart — open cart dropdown via top-right icon — verify item name and price visible. Stop once item is confirmed in dropdown."
+    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — open cart dropdown via top-right icon — verify item name and price visible. Stop once item confirmed in dropdown."
   },
   {
     "scenario_id": "SC-003",
@@ -17,7 +17,7 @@
   {
     "scenario_id": "SC-004",
     "test_case_id": "TC-004",
-    "objective": "Navigate to Components category (path=25) — click Apple in Manufacturer sidebar — verify filtered results load. Stop once filtered list is confirmed."
+    "objective": "Go directly to Components category (path=25) — click Apple in the MANUFACTURER sidebar filter — verify product grid updates to filtered results. Stop once filtered list confirmed. Do not navigate to any other site first."
   },
   {
     "scenario_id": "SC-005",
@@ -42,22 +42,22 @@
   {
     "scenario_id": "SC-009",
     "test_case_id": "TC-009",
-    "objective": "Navigate to /index.php?route=account/login — enter credentials — click Login — verify URL contains route=account/account. Stop immediately once dashboard is confirmed. Do not navigate further."
+    "objective": "Go to /account/login — try Email=stlctest@example.com Password=Test@12345; if invalid register first at /account/register with those credentials — verify account dashboard URL contains account/account. Stop immediately once dashboard confirmed."
   },
   {
     "scenario_id": "SC-010",
     "test_case_id": "TC-010",
-    "objective": "Navigate to login page — log in — click My Account dropdown — click Logout — verify redirect to home page. Stop once home page confirmed."
+    "objective": "Go to /account/login — log in with Email=stlctest@example.com Password=Test@12345 (register first if needed) — click My Account dropdown — click Logout — verify redirect to home page. Stop once home page confirmed."
   },
   {
     "scenario_id": "SC-011",
     "test_case_id": "TC-011",
-    "objective": "Navigate to product_id=28 — click Add to Cart — navigate to checkout/cart — click Remove — verify cart shows empty. Stop once empty message confirmed."
+    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — navigate to checkout/cart — click Remove — verify cart shows empty. Stop once empty message confirmed."
   },
   {
     "scenario_id": "SC-012",
     "test_case_id": "TC-012",
-    "objective": "Navigate to product_id=28 — click Add to Cart — navigate to checkout/cart — change quantity to 2 — click Update — verify line total recalculates. Stop once updated total confirmed."
+    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — navigate to checkout/cart — change quantity to 2 — click Update — verify line total reflects 2 items. Stop once recalculated total confirmed."
   },
   {
     "scenario_id": "SC-013",
@@ -67,11 +67,11 @@
   {
     "scenario_id": "SC-014",
     "test_case_id": "TC-014",
-    "objective": "Log in — navigate to product_id=40 — click Add to Wish List — verify success message or wishlist page. Stop once confirmation visible."
+    "objective": "Go to /account/login — log in with Email=stlctest@example.com Password=Test@12345 (register first if needed) — navigate to product_id=40 — click Add to Wish List heart icon — verify success notification. Stop once wish list success message shown."
   },
   {
     "scenario_id": "SC-015",
     "test_case_id": "TC-015",
-    "objective": "Navigate to product_id=28 — click Add to Cart — navigate to checkout/checkout — select Guest Checkout — fill address form — select Flat Rate shipping — verify proceed to payment. Stop once shipping confirmed."
+    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — navigate to checkout/checkout — select Guest Checkout — fill address (First=Test Last=User Email=guest@test.com Address=123 Main St City=Austin Postcode=78701 Country=US State=Texas) — select Flat Rate shipping — verify proceed past shipping step. Stop once shipping confirmed."
   }
 ]

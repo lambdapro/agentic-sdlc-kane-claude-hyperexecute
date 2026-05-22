@@ -16,7 +16,7 @@
     "last_verified": "2026-05-11",
     "description": "User can add a product to the cart from the product detail page and see the cart item count update",
     "feature": "CART",
-    "kane_objective": "Navigate to product_id=28 \u2014 click Add to Cart \u2014 verify cart icon count updates. Stop once confirmed."
+    "kane_objective": "Go to Cameras category (path=33) \u2014 click first in-stock product \u2014 click Add to Cart (active button, not Out Of Stock) \u2014 verify cart icon count increments. Stop immediately once cart count updated."
   },
   {
     "id": "SC-002",
@@ -35,7 +35,7 @@
     "last_verified": "2026-05-11",
     "description": "User can open the cart dropdown and see the list of added items with their names and prices",
     "feature": "CART",
-    "kane_objective": "Navigate to product_id=28 \u2014 add to cart \u2014 open cart dropdown \u2014 verify item name and price. Stop once confirmed.",
+    "kane_objective": "Go to Cameras category (path=33) \u2014 click first in-stock product \u2014 click Add to Cart \u2014 open cart dropdown via top-right icon \u2014 verify item name and price visible. Stop once item confirmed in dropdown.",
     "updated_at": "2026-05-13T23:35:57.885930+00:00"
   },
   {
@@ -75,7 +75,7 @@
     "last_verified": "2026-05-11",
     "description": "User can apply a manufacturer brand filter from the sidebar to narrow product results",
     "feature": "FILTER",
-    "kane_objective": "User can apply a manufacturer brand filter from the sidebar to narrow product results",
+    "kane_objective": "Go directly to Components category (path=25) — click Apple in the MANUFACTURER sidebar filter — verify product grid updates to show filtered results. Stop once filtered list confirmed. Do not navigate to any other site first.",
     "updated_at": "2026-05-13T23:35:57.885971+00:00"
   },
   {
@@ -154,7 +154,7 @@
     "feature": "AUTH",
     "status": "active",
     "created_at": "2026-05-13T23:35:57.886137+00:00",
-    "kane_objective": "Navigate to /account/login \u2014 enter credentials \u2014 click Login \u2014 verify dashboard URL. Stop immediately once confirmed."
+    "kane_objective": "Go to /account/login \u2014 try Email=stlctest@example.com Password=Test@12345; if invalid register first at /account/register with those credentials \u2014 verify account dashboard URL contains account/account. Stop immediately once dashboard confirmed."
   },
   {
     "id": "SC-010",
@@ -163,7 +163,7 @@
     "feature": "GENERAL",
     "status": "active",
     "created_at": "2026-05-13T23:35:57.886159+00:00",
-    "kane_objective": "Log in \u2014 click My Account dropdown \u2014 click Logout \u2014 verify home page redirect. Stop once confirmed."
+    "kane_objective": "Go to /account/login \u2014 log in with Email=stlctest@example.com Password=Test@12345 (register first if needed) \u2014 click My Account dropdown \u2014 click Logout \u2014 verify redirect to home page. Stop once home page confirmed."
   },
   {
     "id": "SC-011",
@@ -172,7 +172,7 @@
     "feature": "CART",
     "status": "active",
     "created_at": "2026-05-13T23:35:57.886172+00:00",
-    "kane_objective": "Navigate to product_id=28 \u2014 add to cart \u2014 navigate to checkout/cart \u2014 click Remove \u2014 verify cart empty. Stop once confirmed."
+    "kane_objective": "Go to Cameras category (path=33) \u2014 click first in-stock product \u2014 click Add to Cart \u2014 navigate to checkout/cart \u2014 click Remove \u2014 verify cart shows empty. Stop once empty message confirmed."
   },
   {
     "id": "SC-012",
@@ -181,7 +181,7 @@
     "feature": "CART",
     "status": "active",
     "created_at": "2026-05-13T23:35:57.886184+00:00",
-    "kane_objective": "Navigate to product_id=28 \u2014 add to cart \u2014 navigate to checkout/cart \u2014 change qty to 2 \u2014 update \u2014 verify total recalculates. Stop once confirmed."
+    "kane_objective": "Go to Cameras category (path=33) \u2014 click first in-stock product \u2014 click Add to Cart \u2014 navigate to checkout/cart \u2014 change quantity to 2 \u2014 click Update \u2014 verify line total reflects 2 items. Stop once recalculated total confirmed."
   },
   {
     "id": "SC-013",
@@ -199,7 +199,7 @@
     "feature": "PRODUCT_DETAIL",
     "status": "active",
     "created_at": "2026-05-13T23:35:57.886220+00:00",
-    "kane_objective": "Log in \u2014 navigate to product_id=40 \u2014 click Add to Wish List \u2014 verify confirmation. Stop once wishlist confirmed."
+    "kane_objective": "Go to /account/login \u2014 log in with Email=stlctest@example.com Password=Test@12345 (register first if needed) \u2014 navigate to product_id=40 \u2014 click Add to Wish List heart icon \u2014 verify success notification. Stop once wish list success message shown."
   },
   {
     "id": "SC-015",
@@ -208,6 +208,6 @@
     "feature": "CHECKOUT",
     "status": "active",
     "created_at": "2026-05-13T23:35:57.886235+00:00",
-    "kane_objective": "Navigate to product_id=28 \u2014 add to cart \u2014 navigate to checkout \u2014 select Guest Checkout \u2014 fill address \u2014 select Flat Rate \u2014 verify proceed. Stop once shipping confirmed."
+    "kane_objective": "Go to Cameras category (path=33) \u2014 click first in-stock product \u2014 click Add to Cart \u2014 navigate to checkout \u2014 select Guest Checkout \u2014 fill address (First=Test Last=User Email=guest@test.com Address=123 Main St City=Austin Postcode=78701 Country=US State=Texas) \u2014 select Flat Rate shipping \u2014 verify proceed. Stop once shipping confirmed."
   }
 ]
