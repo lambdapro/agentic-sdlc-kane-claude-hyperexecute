@@ -875,6 +875,7 @@ _ADVISORY_SCRIPTS = [
     "ci/fetch_rca.py",
     "ci/failure_intelligence.py",
     "ci/self_healing.py",
+    "ci/rca_enrichment.py",
     "ci/validate_report.py",
     "ci/pipeline_metrics.py",
 ]

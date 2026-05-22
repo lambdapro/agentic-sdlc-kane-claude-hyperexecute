@@ -601,6 +601,80 @@ def main():
                 emit(f"> **Root Cause:** {rca[:300]}")
                 emit("")
 
+    # ── Enriched RCA (rca_enrichment.py) ──────────────────────────────────────
+    enriched_data = load_json("reports/rca_enriched.json", {})
+    enriched_analyses = enriched_data.get("analyses", [])
+    if enriched_analyses:
+        emit("## Enriched RCA — Autonomous Failure Diagnosis")
+        emit("")
+        mcp_badge = "MCP-enriched" if enriched_data.get("mcp_available") else "REST-only"
+        emit(f"_{enriched_data.get('total_failures_analyzed', 0)} failure(s) diagnosed · {mcp_badge}_")
+        emit("")
+
+        s = enriched_data.get("summary", {})
+        emit("| Confidence | Count | Likely Flaky | Systemic (all browsers) |")
+        emit("|---|---|---|---|")
+        emit(f"| 🟢 HIGH (75-100) | {s.get('high_confidence', 0)} | "
+             f"{s.get('likely_flaky', 0)} | {s.get('systemic_failures', 0)} |")
+        emit(f"| 🟡 MEDIUM (50-74) | {s.get('medium_confidence', 0)} | | |")
+        emit(f"| 🔴 LOW (<50) | {s.get('low_confidence', 0)} | | |")
+        emit("")
+
+        emit("| Scenario | Failure Type | Confidence | Scope | Flakiness | Root Cause | Remediation | Artifacts |")
+        emit("|---|---|---|---|---|---|---|---|")
+        for a in enriched_analyses:
+            sc_id      = a.get("scenario_id", "?")
+            ftype      = a.get("failure_type", "UNKNOWN")
+            confidence = a.get("confidence", 0)
+            band       = a.get("confidence_band", "LOW")
+            conf_icon  = {"HIGH": "🟢", "MEDIUM": "🟡", "LOW": "🔴"}.get(band, "⚪")
+            scope      = a.get("browser_correlation", {}).get("failure_scope", "NO_DATA")
+            scope_icon = {"ALL_BROWSERS": "🌐", "SINGLE_BROWSER": "🔬", "SOME_BROWSERS": "⚠️", "NO_DATA": "—"}.get(scope, "—")
+            flaky_v    = a.get("flakiness", {}).get("verdict", "REPRODUCIBLE")
+            flaky_icon = "🎲" if "FLAKY" in flaky_v else "🔁"
+            rca_text   = a.get("enhanced_rca", "")
+            rca_short  = (rca_text[:80] + "…") if len(rca_text) > 80 else rca_text
+            rec_text   = a.get("remediation", {}).get("recommended_action", "")
+            rec_short  = (rec_text[:60] + "…") if len(rec_text) > 60 else rec_text
+            video      = a.get("artifacts", {}).get("video_url", "")
+            shot       = a.get("artifacts", {}).get("screenshot_url", "")
+            artifact_md = " ".join(filter(None, [
+                f"[▶]({video})" if video else "",
+                f"[📷]({shot})" if shot else "",
+            ])) or "—"
+            emit(f"| `{sc_id}` | `{ftype}` | {conf_icon} {confidence}% | "
+                 f"{scope_icon} {scope} | {flaky_icon} {flaky_v} | "
+                 f"{rca_short} | {rec_short} | {artifact_md} |")
+        emit("")
+
+        emit("<details>")
+        emit("<summary>Full remediation details</summary>")
+        emit("")
+        for a in enriched_analyses:
+            rem = a.get("remediation", {})
+            emit(f"**`{a.get('scenario_id')}` — {a.get('failure_type')} "
+                 f"(confidence: {a.get('confidence')}%)**")
+            emit("")
+            if rem.get("recommended_action"):
+                emit(f"> {rem['recommended_action']}")
+            if rem.get("patch_detail"):
+                emit(f"> {rem['patch_detail']}")
+            if rem.get("retry_guidance"):
+                emit(f"> _{rem['retry_guidance']}_")
+            if a.get("console_errors"):
+                emit(f"**Console:** `{a['console_errors'][0][:200]}`")
+            if a.get("network_errors"):
+                err = a["network_errors"][0]
+                emit(f"**Network:** `{err.get('method','GET')} {err.get('url','')[:120]}` → HTTP {err.get('status','?')}")
+            ev = rem.get("evidence_links", {})
+            if ev.get("video"):
+                emit(f"**Video:** {ev['video']}")
+            if ev.get("screenshot"):
+                emit(f"**Screenshot:** {ev['screenshot']}")
+            emit("")
+        emit("</details>")
+        emit("")
+
     # ── Release Recommendation ─────────────────────────────────────────────────
     emit("## Release Recommendation")
     emit("")
