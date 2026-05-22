@@ -93,7 +93,9 @@ runs:
     - name: "Install Kane CLI"
       if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo-mode != 'true'
       shell: bash
-      run: npm install -g @testmuai/kane-cli --force
+      run: |
+        npm install -g @testmuai/kane-cli --force
+        npm install -g google-protobuf@^6 --force
 
     - name: "Configure Kane CLI"
       if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo-mode != 'true' && inputs.kane-project-id != ''
@@ -116,19 +118,35 @@ runs:
       continue-on-error: true
       run: |
         python - <<'PYEOF'
-        import json, sys
+        import json, sys, os
         from pathlib import Path
         p = Path('requirements/analyzed_requirements.json')
         if not p.exists() or not p.stat().st_size:
-            print("Cached artifact missing or empty — will fall through to live Kane")
+            print("Cached artifact missing or empty — falling through to live Kane")
             sys.exit(1)
         data = json.loads(p.read_text(encoding='utf-8'))
-        passed = sum(1 for r in data if r.get('kane_status') == 'passed')
-        print(f"CACHE HIT — reusing Kane results ({len(data)} requirements, {passed} passed)")
+        errors  = sum(1 for r in data if r.get('kane_status') == 'error')
+        passed  = sum(1 for r in data if r.get('kane_status') == 'passed')
+        if errors == len(data):
+            print(f"All {errors} cached results are errors — rejecting cache, re-running Kane live")
+            p.unlink()
+            with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                f.write("cache_valid=false\n")
+            sys.exit(1)
+        print(f"CACHE HIT valid — {len(data)} requirements, {passed} passed, {errors} errored")
+        with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+            f.write("cache_valid=true\n")
         PYEOF
 
+    - name: "Install Kane CLI (cache-rejected fallback)"
+      if: steps.kane-cache.outputs.cache-hit == 'true' && steps.validate-cache.outputs.cache_valid == 'false' && inputs.demo-mode != 'true'
+      shell: bash
+      run: |
+        npm install -g @testmuai/kane-cli --force
+        npm install -g google-protobuf@^6 --force
+
     - name: "Run KaneAI (live verification)"
-      if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo-mode != 'true'
+      if: (steps.kane-cache.outputs.cache-hit != 'true' || steps.validate-cache.outputs.cache_valid == 'false') && inputs.demo-mode != 'true'
       shell: bash
       env:
         LT_USERNAME: ${{ inputs.lt-username }}
