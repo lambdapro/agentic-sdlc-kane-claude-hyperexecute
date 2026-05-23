@@ -87,7 +87,9 @@ runs:
 
     - name: "Install Python dependencies"
       shell: bash
-      run: pip install -r requirements.txt --cache-dir ~/.cache/pip -q
+      run: |
+        pip install -r requirements.txt --cache-dir ~/.cache/pip -q
+        pip install "protobuf>=6.31.0" -q
 
     - name: "Install Kane CLI"
       if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo-mode != 'true'
