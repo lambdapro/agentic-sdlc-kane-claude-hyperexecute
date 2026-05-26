@@ -2,76 +2,76 @@
   {
     "scenario_id": "SC-001",
     "test_case_id": "TC-001",
-    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart (not Out Of Stock) — verify cart icon count increments to 1. Stop immediately once cart count updated."
+    "objective": "searched for products on ecommerce-playground.lambdatest.io"
   },
   {
     "scenario_id": "SC-002",
     "test_case_id": "TC-002",
-    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — open cart dropdown via top-right icon — verify item name and price visible. Stop once item confirmed in dropdown."
+    "objective": "attempted to open the cart and select a product option on ecommerce-playground.lambdatest.io"
   },
   {
     "scenario_id": "SC-003",
     "test_case_id": "TC-003",
-    "objective": "Navigate to Laptops category (path=18) — verify product grid with thumbnails is visible. Stop once confirmed."
+    "objective": "opened the Laptops product catalog on ecommerce-playground.lambdatest.io"
   },
   {
     "scenario_id": "SC-004",
     "test_case_id": "TC-004",
-    "objective": "Go directly to Components category (path=25) — click Apple in the MANUFACTURER sidebar filter — verify product grid updates to filtered results. Stop once filtered list confirmed. Do not navigate to any other site first."
+    "objective": "attempted to filter Components by Apple on ecommerce-playground.lambdatest.io"
   },
   {
     "scenario_id": "SC-005",
     "test_case_id": "TC-005",
-    "objective": "Navigate to product_id=28 — verify product name (h1) and price are visible. Stop once both confirmed."
+    "objective": "opened a product detail page on ecommerce-playground.lambdatest.io"
   },
   {
     "scenario_id": "SC-006",
     "test_case_id": "TC-006",
-    "objective": "Navigate to homepage without login — verify banner and product listing section are visible. Stop once confirmed."
+    "objective": "browsed the homepage and product listings on ecommerce-playground.lambdatest.io"
   },
   {
     "scenario_id": "SC-007",
     "test_case_id": "TC-007",
-    "objective": "Navigate to homepage — type iPhone in search bar — press Enter — verify results page shows product thumbnails. Stop once results confirmed."
+    "objective": "searched for an iPhone on ecommerce-playground.lambdatest.io"
   },
   {
     "scenario_id": "SC-008",
-    "test_case_id": "TC-008",
-    "objective": "Navigate to /index.php?route=account/register — verify all fields: first name, last name, email, telephone, password are present. Stop once form fields confirmed."
+    "test_case_id": "",
+    "objective": "SC-008"
   },
   {
     "scenario_id": "SC-009",
-    "test_case_id": "TC-009",
-    "objective": "Go to /account/login — try Email=stlctest@example.com Password=Test@12345; if invalid register first at /account/register with those credentials — verify account dashboard URL contains account/account. Stop immediately once dashboard confirmed."
+    "test_case_id": "",
+    "objective": "SC-009"
   },
   {
     "scenario_id": "SC-010",
-    "test_case_id": "TC-010",
-    "objective": "Go to /account/login — log in with Email=stlctest@example.com Password=Test@12345 (register first if needed) — click My Account dropdown — click Logout — verify redirect to home page. Stop once home page confirmed."
+    "test_case_id": "",
+    "objective": "SC-010"
   },
   {
     "scenario_id": "SC-011",
-    "test_case_id": "TC-011",
-    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — navigate to checkout/cart — click Remove — verify cart shows empty. Stop once empty message confirmed."
+    "test_case_id": "",
+    "objective": "SC-011"
   },
   {
     "scenario_id": "SC-012",
-    "test_case_id": "TC-012",
-    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — navigate to checkout/cart — change quantity to 2 — click Update — verify line total reflects 2 items. Stop once recalculated total confirmed."
+    "test_case_id": "",
+    "objective": "SC-012"
   },
   {
     "scenario_id": "SC-013",
-    "test_case_id": "TC-013",
-    "objective": "Navigate to category path=20 — select Price (Low > High) from Sort By — verify product grid order changes. Stop once sort applied."
+    "test_case_id": "",
+    "objective": "SC-013"
   },
   {
     "scenario_id": "SC-014",
-    "test_case_id": "TC-014",
-    "objective": "Go to /account/login — log in with Email=stlctest@example.com Password=Test@12345 (register first if needed) — navigate to product_id=40 — click Add to Wish List heart icon — verify success notification. Stop once wish list success message shown."
+    "test_case_id": "",
+    "objective": "SC-014"
   },
   {
     "scenario_id": "SC-015",
-    "test_case_id": "TC-015",
-    "objective": "Go to Cameras category (path=33) — click first in-stock product — click Add to Cart — navigate to checkout/checkout — select Guest Checkout — fill address (First=Test Last=User Email=guest@test.com Address=123 Main St City=Austin Postcode=78701 Country=US State=Texas) — select Flat Rate shipping — verify proceed past shipping step. Stop once shipping confirmed."
+    "test_case_id": "",
+    "objective": "SC-015"
   }
 ]

@@ -153,7 +153,7 @@ def main():
     artifact_output_dir = Path("reports/api-artifacts")
     job_id = result.get("id")
     if headers and job_id:
-        for artifact_name in ["selenium-test-reports", "hyperexecute-runtime"]:
+        for artifact_name in ["playwright-test-reports", "hyperexecute-runtime"]:
             try:
                 artifact_paths.append(str(download_artifact_bundle(job_id, artifact_name, headers, artifact_output_dir)))
             except Exception:
@@ -185,7 +185,7 @@ def main():
                 "",
                 "## Artifact Links",
                 "",
-                f"- Selenium reports: https://hyperexecute.lambdatest.com/artifact/view/{job_id}?artifactName=selenium-test-reports",
+                f"- Playwright reports: https://hyperexecute.lambdatest.com/artifact/view/{job_id}?artifactName=playwright-test-reports",
                 f"- Runtime logs: https://hyperexecute.lambdatest.com/artifact/view/{job_id}?artifactName=hyperexecute-runtime",
             ]
         )

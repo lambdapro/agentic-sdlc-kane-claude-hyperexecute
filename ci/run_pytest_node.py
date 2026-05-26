@@ -11,8 +11,7 @@ def parse_args():
 
 def safe_name(nodeid):
     return (
-        nodeid.replace("tests/selenium/test_credit_cards.py::", "")
-        .replace("::", "__")
+        nodeid.replace("::", "__")
         .replace("/", "_")
     )
 

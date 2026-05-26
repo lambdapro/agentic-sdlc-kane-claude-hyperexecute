@@ -1,0 +1,230 @@
+name: Agentic STLC — On-Demand (Skill-Triggered)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggered by the Claude Code "agentic-stlc" skill via:
+#   1. workflow_dispatch  — manual / API dispatch (gh CLI or GitHub API)
+#   2. repository_dispatch — programmatic trigger with client_payload
+#
+# Event-driven design: posts a JSON callback to callback_url at each stage
+# so the local webhook_server.py receives notifications instead of polling.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      full_run:
+        description: "Run all active scenarios (not just new/updated)"
+        required: false
+        default: "false"
+        type: string
+      callback_url:
+        description: "Webhook URL to POST stage events to (leave blank to skip callbacks)"
+        required: false
+        default: ""
+        type: string
+      target_branch:
+        description: "Branch to run against (default: product)"
+        required: false
+        default: "product"
+        type: string
+      demo_mode:
+        description: "Use pre-generated Kane results (skip live Kane calls)"
+        required: false
+        default: "false"
+        type: string
+
+  repository_dispatch:
+    types: [agentic-stlc-run]
+
+env:
+  NODE_VERSION:   "22"
+  PYTHON_VERSION: "3.11"
+  # Resolve callback URL from either trigger source
+  CALLBACK_URL:   ${{ inputs.callback_url || github.event.client_payload.callback_url || '' }}
+  FULL_RUN:       ${{ inputs.full_run || github.event.client_payload.full_run || 'false' }}
+  DEMO_MODE:      ${{ inputs.demo_mode || github.event.client_payload.demo_mode || 'false' }}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable callback step — posts a JSON event to the callback URL.
+# Called via `uses: ./.github/actions/notify` (defined inline below).
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+
+  # ── Stage 1: KaneAI Functional Verification ──────────────────────────────────
+  analyze:
+    name: "Stage 1 · KaneAI Verification"
+    runs-on: ubuntu-latest
+    outputs:
+      requirements-count: ${{ steps.analyze.outputs.requirements_count }}
+      kane-passed:        ${{ steps.analyze.outputs.kane_passed }}
+      kane-failed:        ${{ steps.analyze.outputs.kane_failed }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch || github.event.client_payload.branch || 'product' }}
+
+      - name: "Notify — pipeline started"
+        if: env.CALLBACK_URL != ''
+        uses: ./.github/actions/notify
+        with:
+          callback-url: ${{ env.CALLBACK_URL }}
+          event: "pipeline_started"
+          payload: |
+            {
+              "run_id":   "${{ github.run_id }}",
+              "branch":   "${{ inputs.target_branch || github.event.client_payload.branch || 'product' }}",
+              "html_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+
+      - name: "Run KaneAI Analysis"
+        id: analyze
+        uses: ./.github/actions/analyze
+        with:
+          lt-username:     ${{ secrets.LT_USERNAME }}
+          lt-access-key:   ${{ secrets.LT_ACCESS_KEY }}
+          node-version:    ${{ env.NODE_VERSION }}
+          python-version:  ${{ env.PYTHON_VERSION }}
+          demo-mode:       ${{ env.DEMO_MODE }}
+          kane-project-id: "01J2VAWPNBPA21T0BW44JW026X"
+          kane-folder-id:  "01KPD0NC5ZXZD9EXB23QCATTG2"
+
+      - name: "Notify — analyze complete"
+        if: always() && env.CALLBACK_URL != ''
+        uses: ./.github/actions/notify
+        with:
+          callback-url: ${{ env.CALLBACK_URL }}
+          event: "stage_complete"
+          payload: |
+            {
+              "stage":   "analyze",
+              "total":   "${{ steps.analyze.outputs.requirements_count }}",
+              "passed":  "${{ steps.analyze.outputs.kane_passed }}",
+              "failed":  "${{ steps.analyze.outputs.kane_failed }}",
+              "status":  "${{ job.status }}"
+            }
+
+  # ── Stages 2–9: Orchestrator ─────────────────────────────────────────────────
+  orchestrate:
+    name: "Stages 2–9 · Orchestrator"
+    needs: analyze
+    runs-on: ubuntu-latest
+    outputs:
+      verdict:              ${{ steps.orchestrate.outputs.verdict }}
+      pass-rate:            ${{ steps.orchestrate.outputs.pass_rate }}
+      quality-gates-passed: ${{ steps.orchestrate.outputs.quality_gates_passed }}
+      he-job-id:            ${{ steps.orchestrate.outputs.he_job_id }}
+      scenarios-new:        ${{ steps.orchestrate.outputs.scenarios_new }}
+      scenarios-updated:    ${{ steps.orchestrate.outputs.scenarios_updated }}
+      tests-selected:       ${{ steps.orchestrate.outputs.tests_selected }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch || github.event.client_payload.branch || 'product' }}
+
+      - name: "Notify — scenarios stage starting"
+        if: env.CALLBACK_URL != ''
+        uses: ./.github/actions/notify
+        with:
+          callback-url: ${{ env.CALLBACK_URL }}
+          event: "stage_progress"
+          payload: |
+            {"stage": "scenarios", "status": "running"}
+
+      - name: "Run Orchestrator"
+        id: orchestrate
+        uses: ./.github/actions/orchestrate
+        with:
+          lt-username:    ${{ secrets.LT_USERNAME }}
+          lt-access-key:  ${{ secrets.LT_ACCESS_KEY }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          full-run:       ${{ env.FULL_RUN }}
+          target-url:     ""
+          he-config:      "hyperexecute.yaml"
+          callback-url:   ${{ env.CALLBACK_URL }}
+
+      - name: "Notify — orchestrate complete"
+        if: always() && env.CALLBACK_URL != ''
+        uses: ./.github/actions/notify
+        with:
+          callback-url: ${{ env.CALLBACK_URL }}
+          event: "stage_complete"
+          payload: |
+            {
+              "stage":            "hyperexecute_done",
+              "verdict":          "${{ steps.orchestrate.outputs.verdict }}",
+              "pass_rate":        "${{ steps.orchestrate.outputs.pass_rate }}",
+              "he_job_id":        "${{ steps.orchestrate.outputs.he_job_id }}",
+              "he_url":           "https://hyperexecute.lambdatest.com/hyperexecute/task?jobId=${{ steps.orchestrate.outputs.he_job_id }}",
+              "scenarios_new":    "${{ steps.orchestrate.outputs.scenarios_new }}",
+              "scenarios_updated":"${{ steps.orchestrate.outputs.scenarios_updated }}",
+              "tests_selected":   "${{ steps.orchestrate.outputs.tests_selected }}",
+              "status":           "${{ job.status }}"
+            }
+
+  # ── Summary + Final Notification ─────────────────────────────────────────────
+  summary:
+    name: "Pipeline Summary"
+    needs: [analyze, orchestrate]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch || github.event.client_payload.branch || 'product' }}
+
+      - name: "Print step summary"
+        run: |
+          verdict="${{ needs.orchestrate.outputs.verdict }}"
+          rate="${{ needs.orchestrate.outputs.pass-rate }}"
+          run_id="${{ github.run_id }}"
+          he_job="${{ needs.orchestrate.outputs.he-job-id }}"
+
+          {
+            echo "## Agentic STLC — Skill Run #${run_id}"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| **Verdict** | **${verdict}** |"
+            echo "| Pass rate | ${rate}% |"
+            echo "| Requirements | ${{ needs.analyze.outputs.requirements-count }} |"
+            echo "| Kane passed | ${{ needs.analyze.outputs.kane-passed }} |"
+            echo "| Quality gates | ${{ needs.orchestrate.outputs.quality-gates-passed }} |"
+            echo "| Run | [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |"
+            if [ -n "${he_job}" ]; then
+              echo "| HyperExecute | [Job ${he_job}](https://hyperexecute.lambdatest.com/hyperexecute/task?jobId=${he_job}) |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Determine overall success"
+        id: overall
+        run: |
+          analyze_result="${{ needs.analyze.result }}"
+          orchestrate_result="${{ needs.orchestrate.result }}"
+          if [[ "$analyze_result" == "success" && "$orchestrate_result" == "success" ]]; then
+            echo "pipeline_event=pipeline_complete" >> "$GITHUB_OUTPUT"
+          else
+            echo "pipeline_event=pipeline_failed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Notify — pipeline complete"
+        if: env.CALLBACK_URL != ''
+        uses: ./.github/actions/notify
+        with:
+          callback-url: ${{ env.CALLBACK_URL }}
+          event: ${{ steps.overall.outputs.pipeline_event }}
+          payload: |
+            {
+              "run_id":               "${{ github.run_id }}",
+              "verdict":              "${{ needs.orchestrate.outputs.verdict }}",
+              "pass_rate":            "${{ needs.orchestrate.outputs.pass-rate }}",
+              "requirements_count":   "${{ needs.analyze.outputs.requirements-count }}",
+              "kane_passed":          "${{ needs.analyze.outputs.kane-passed }}",
+              "he_job_id":            "${{ needs.orchestrate.outputs.he-job-id }}",
+              "html_url":             "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "analyze_status":       "${{ needs.analyze.result }}",
+              "orchestrate_status":   "${{ needs.orchestrate.result }}"
+            }

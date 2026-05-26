@@ -1,0 +1,56 @@
+name: "Notify Webhook"
+description: "POST a pipeline event to the skill's local webhook server (event-driven, no polling)"
+
+inputs:
+  callback-url:
+    description: "URL to POST the event to"
+    required: true
+  event:
+    description: "Event type (e.g. pipeline_started, stage_complete, pipeline_complete)"
+    required: true
+  payload:
+    description: "JSON payload for the event's data field"
+    required: false
+    default: "{}"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "POST event callback"
+      shell: bash
+      env:
+        CALLBACK_URL: ${{ inputs.callback-url }}
+        EVENT_TYPE:   ${{ inputs.event }}
+        PAYLOAD:      ${{ inputs.payload }}
+      run: |
+        if [ -z "${CALLBACK_URL}" ]; then
+          echo "[notify] no callback URL — skipping"
+          exit 0
+        fi
+
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        BODY=$(printf '{"event":"%s","timestamp":"%s","data":%s}' \
+          "${EVENT_TYPE}" "${TIMESTAMP}" "${PAYLOAD}")
+
+        echo "[notify] POST ${EVENT_TYPE} → ${CALLBACK_URL}"
+
+        # Try up to 3 times with 2s backoff
+        for attempt in 1 2 3; do
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 10 \
+            -X POST "${CALLBACK_URL}" \
+            -H "Content-Type: application/json" \
+            -H "X-Agentic-STLC-Event: ${EVENT_TYPE}" \
+            -d "${BODY}" 2>/dev/null || echo "000")
+
+          if [[ "${HTTP_CODE}" == "200" || "${HTTP_CODE}" == "202" ]]; then
+            echo "[notify] accepted (HTTP ${HTTP_CODE})"
+            exit 0
+          fi
+
+          echo "[notify] attempt ${attempt} — HTTP ${HTTP_CODE} — retrying in 2s"
+          sleep 2
+        done
+
+        echo "[notify] callback failed after 3 attempts — continuing pipeline"
+        exit 0

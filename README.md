@@ -289,7 +289,326 @@ This enables Claude Code to query LambdaTest directly — list sessions, check b
 
 ## Usage Flows
 
-There are two ways to run the pipeline. **Option 1 (Chat-First)** is the recommended path for autonomous QA; **Option 2 (Git Push)** integrates directly into existing CI/CD workflows.
+There are three ways to run the pipeline. **The Skill** is the recommended zero-friction path; **Option 1 (Chat-First)** is the manual chat flow; **Option 2 (Git Push)** integrates with standard CI/CD.
+
+---
+
+## The Agentic STLC Skill — Chat-Native Pipeline Execution
+
+> Paste requirements into chat. The skill handles everything else — parsing, committing, triggering CI, streaming events, collecting artifacts, and running RCA — all without leaving the conversation.
+
+### What It Is
+
+The **Agentic STLC Skill** is a Claude Code plug-in that turns the entire pipeline into a single conversational interaction. It is implemented as:
+
+| Component | File | Purpose |
+|---|---|---|
+| Skill definition | `~/.claude/skills/agentic-stlc/SKILL.md` | Instructs Claude how to orchestrate the pipeline |
+| Orchestrator | `ci/conversational_orchestrator.py` | CLI: git commit, workflow dispatch, event watching, artifact collection, RCA |
+| Webhook server | `ci/webhook_server.py` | Local HTTP server — receives stage callbacks from GitHub Actions (event-driven) |
+| On-demand workflow | `.github/workflows/agentic-stlc-on-demand.yml` | CI workflow with per-stage webhook callbacks |
+| Notify action | `.github/actions/notify/action.yml` | Composite action that POSTs events to the local webhook server |
+
+### Architecture
+
+```
+┌─ User Chat ─────────────────────────────────────────────────────────┐
+│  "Generate and execute tests for: User can add product to cart..."  │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                │ Claude activates SKILL.md
+                                ▼
+┌─ SKILL.md (Claude Code Skill) ──────────────────────────────────────┐
+│  Step 1: Parse requirements (plain text / PRD / Jira / Gherkin)     │
+│  Step 2: Confirm with user (one prompt, then autonomous)            │
+│  Step 3: Write requirements/search.txt                              │
+│  Step 4: git commit + push → product branch                        │
+│  Step 5: Start local webhook server (port 8765)                     │
+│  Step 6: Dispatch agentic-stlc-on-demand.yml via GitHub API        │
+│  Step 7: Stream events from webhook (event-driven, no polling)      │
+│  Step 8: Collect + display results                                  │
+│  Step 9: Auto-run RCA                                               │
+└────────────────────┬───────────────────────────────────────────────┘
+                     │ workflow_dispatch + callback_url
+                     ▼
+┌─ GitHub Actions: agentic-stlc-on-demand.yml ────────────────────────┐
+│  Job: analyze                                                        │
+│    → Kane AI (5 parallel workers)                                   │
+│    → POST /callback {"event":"stage_complete","stage":"analyze"}    │
+│                                                                      │
+│  Job: orchestrate                                                    │
+│    → Scenario sync + Playwright gen + HyperExecute                  │
+│    → POST /callback {"event":"stage_complete","stage":"..."}        │
+│    → POST /callback {"event":"stage_complete","stage":"hyperexecute_done"} │
+│                                                                      │
+│  Job: summary                                                        │
+│    → POST /callback {"event":"pipeline_complete","verdict":"GREEN"} │
+└────────────────────┬───────────────────────────────────────────────┘
+                     │ HTTP POST (event-driven, not polling)
+                     ▼
+┌─ Local webhook_server.py (port 8765) ───────────────────────────────┐
+│  Appends each event as JSON line to reports/.webhook_events.ndjson  │
+└────────────────────┬───────────────────────────────────────────────┘
+                     │ file-based event stream
+                     ▼
+┌─ conversational_orchestrator.py --mode watch-events ────────────────┐
+│  Tails .webhook_events.ndjson, formats + prints each stage update  │
+│  Claude echoes each line to the chat interface in real time        │
+└────────────────────┬───────────────────────────────────────────────┘
+                     │ pipeline_complete received
+                     ▼
+┌─ RCA + Final Report ────────────────────────────────────────────────┐
+│  RCASkill → rca_report.json → actionable findings per requirement   │
+│  LambdaTest MCP → session links, video, console logs               │
+│  Final verdict + traceability table displayed in chat              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Event-Driven Design (No Polling)
+
+The skill uses three event mechanisms — no `sleep` loops or repeated API calls:
+
+| Mechanism | Where | How |
+|---|---|---|
+| **Webhook callbacks** | GitHub Actions → local server | Each CI stage POSTs a JSON event to `http://localhost:8765/callback` |
+| **File-based event stream** | Local filesystem | `webhook_server.py` appends events to `reports/.webhook_events.ndjson`; orchestrator tails with `os.stat()` mtime detection |
+| **HyperExecute callbacks** | HyperExecute → webhook | HE job completion POSTs to `/he-callback` endpoint |
+
+The webhook server is automatically shut down when the `pipeline_complete` or `pipeline_failed` event arrives.
+
+### Setup
+
+#### 1. Install Claude Code (if not already installed)
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+#### 2. Verify skill is available
+
+The skill file is at `~/.claude/skills/agentic-stlc/SKILL.md`. Claude Code loads it automatically. Verify by typing `/agentic-stlc help` in a chat — Claude will describe the skill.
+
+#### 3. Set environment variables
+
+```bash
+# Required
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx        # GitHub PAT with repo + workflow scope
+export LT_USERNAME=your_lambdatest_username
+export LT_ACCESS_KEY=your_lambdatest_key
+
+# Optional — override config defaults
+export AGENTIC_STLC_BRANCH=product         # default target branch
+export AGENTIC_STLC_WEBHOOK_PORT=8765      # local webhook port
+```
+
+On Windows (PowerShell):
+```powershell
+$env:GITHUB_TOKEN   = "ghp_xxxxxxxxxxxx"
+$env:LT_USERNAME    = "your_lt_username"
+$env:LT_ACCESS_KEY  = "your_lt_key"
+```
+
+#### 4. (Optional) Expose local webhook for external callbacks
+
+If running inside a corporate network where GitHub Actions cannot reach `localhost`, expose the webhook via a tunnel:
+
+```bash
+# Using ngrok (free tier)
+ngrok http 8765
+# Copy the https URL, set it in config:
+```
+
+```yaml
+# agentic-stlc.config.yaml
+skill:
+  callback_url: "https://abcd-1234.ngrok.io/callback"
+```
+
+Without a tunnel, the skill falls back to `gh run watch` for event-based monitoring.
+
+#### 5. Configure the skill (optional overrides)
+
+```yaml
+# agentic-stlc.config.yaml
+skill:
+  product_branch: "product"           # default branch
+  github_repo: "owner/repo"           # your fork or repo
+  on_demand_workflow: "agentic-stlc-on-demand.yml"
+  webhook_port: 8765
+  callback_url: ""                    # auto-managed unless you set a tunnel URL
+  artifact_download: true
+  pipeline_timeout_s: 1800
+  auto_rca: true
+```
+
+### Example Interactions
+
+#### Plain English Requirements
+
+```
+User: Generate and execute tests for:
+      - User can add a product to the cart from the product detail page
+      - User can remove an item and see the cart update
+      - User can proceed to guest checkout with flat rate shipping
+
+Claude:
+  Parsed 3 acceptance criteria:
+  1. User can add a product to the cart from the product detail page
+  2. User can remove an item and see the cart update
+  3. User can proceed to guest checkout with flat rate shipping
+
+  Branch target: product | Run mode: incremental
+
+  Proceed? [yes/no/edit branch]
+
+User: yes
+
+Claude:
+  [git] pushed to origin/product — SHA: a7f3c91
+  [webhook] listening on http://localhost:8765/callback
+  [pipeline] triggered run #1337 on branch product
+  [pipeline] monitor: https://github.com/.../actions/runs/1337
+
+  Waiting for stage events...
+
+  [1/7] Pipeline started — run #1337
+  [1/7] KaneAI analysis done — 3 criteria verified — 2/3 passed
+  [2/7] Scenario sync — 2 new, 1 updated
+  [3/7] Playwright tests generated — 3 test functions
+  [4/7] Test selection complete — 3 tests queued for HyperExecute
+  [5/7] HyperExecute submitted — https://hyperexecute.lambdatest.com/...
+  [6/7] HyperExecute complete — 2/3 tests passed
+  [7/7] Traceability matrix built
+
+  ════════════════════════════════════════════════
+  PIPELINE VERDICT: YELLOW
+  Pass rate: 66.7%  |  Requirements: 3
+  Run: #1337
+  HyperExecute: https://hyperexecute.lambdatest.com/...
+  ════════════════════════════════════════════════
+
+  Req ID  Kane      Playwright   Overall   Criterion
+  AC-001  passed    passed       GREEN     User can add a product to the cart...
+  AC-002  passed    passed       GREEN     User can remove an item...
+  AC-003  failed    passed       RED       User can proceed to guest checkout...
+
+  ════════════════════════════════════════════════
+  Root Cause Analysis — 1 failure(s)
+  ════════════════════════════════════════════════
+
+  [KANEAI] AC-003 — SELECTOR
+    Remediation: The guest checkout Size required validation blocked add-to-cart.
+                 Use a product without mandatory options (e.g., product_id=28).
+    Session: https://test-manager.lambdatest.com/...
+```
+
+#### PRD / User Story Format
+
+```
+User: Run the STLC pipeline for this story:
+
+      As a registered customer
+      I want to manage my shopping cart
+      So that I can review and adjust my order before checkout
+
+      Acceptance Criteria:
+      AC-001: Cart icon shows correct item count after adding a product
+      AC-002: Cart page lists all added items with unit price and subtotal
+      AC-003: Quantity can be updated and total recalculates immediately
+      AC-004: Items can be removed individually with confirmation
+
+Claude:  [parses AC-001 through AC-004 and proceeds autonomously]
+```
+
+#### Jira Story
+
+```
+User: Test this Jira story against product branch:
+
+      SHOP-142: Shopping Cart Management
+      Story: As a user I can manage my cart items
+      Acceptance Criteria:
+      - [x] User can add items
+      - [ ] User can update quantities
+      - [ ] User can remove items
+
+Claude:  [strips Jira markup, extracts 3 criteria, proceeds]
+```
+
+#### Gherkin BDD
+
+```
+User: Execute tests for these scenarios:
+
+      Scenario: Add product to cart
+        Given I am on the product detail page for "HTC Touch HD"
+        When I click "Add to Cart"
+        Then the cart icon count should show 1
+
+      Scenario: Remove from cart
+        Given I have 2 items in my cart
+        When I click Remove next to an item
+        Then the cart should show 1 item
+
+Claude:  [extracts 2 scenario descriptions as acceptance criteria, proceeds]
+```
+
+#### Branch Override
+
+```
+User: Run tests for "User can apply filters" against branch feature/search-v2
+
+Claude:  [uses feature/search-v2 as target branch, all other steps identical]
+```
+
+### Event Flow Diagram
+
+```
+Timeline (wall clock)
+
+t=0s   User submits requirements
+t=2s   Requirements written + git pushed
+t=5s   Webhook server starts (port 8765)
+t=8s   GitHub Actions workflow dispatched
+t=12s  [EVENT] pipeline_started
+t=90s  [EVENT] stage_complete (analyze) — Kane done
+t=95s  [EVENT] stage_complete (scenarios) — IDs assigned
+t=98s  [EVENT] stage_complete (playwright) — tests generated
+t=100s [EVENT] stage_complete (selection) — queued
+t=105s [EVENT] stage_complete (hyperexecute_submitted) — HE job created
+t=340s [EVENT] stage_complete (hyperexecute_done) — HE finished
+t=345s [EVENT] stage_complete (traceability) — matrix built
+t=350s [EVENT] pipeline_complete — verdict + RCA triggered
+t=360s Webhook server shuts down automatically
+t=365s Final report displayed in chat
+```
+
+### Troubleshooting
+
+| Problem | Cause | Fix |
+|---|---|---|
+| "GITHUB_TOKEN not set" | Missing env var | `export GITHUB_TOKEN=ghp_...` |
+| "git push failed" | Auth or branch protection | Check PAT has `repo` + `workflow` scopes |
+| "webhook server port in use" | Port 8765 busy | Set `skill.webhook_port: 8766` in config |
+| No events after trigger | GitHub can't reach localhost | Set up ngrok tunnel + `skill.callback_url` |
+| "pipeline timed out after 1800s" | Long-running HE job | Increase `skill.pipeline_timeout_s: 3600` |
+| RCA shows no data | JUnit/Kane data not present | Run with `--full-run` to ensure tests execute |
+| Webhook events file not created | Wrong working directory | Run orchestrator from `d:\agentic-stlc\` root |
+
+### Extensibility
+
+**Add a new input format:**
+Edit `SKILL.md` — the "STEP 1 — Parse Requirements" section. Add a new bullet describing the format and how to extract criteria from it. No Python changes needed.
+
+**Add a new notification channel (Slack, Teams):**
+Add a step to `.github/actions/notify/action.yml` that posts to the channel using `curl` after the existing webhook POST.
+
+**Support a different CI provider (GitLab, Jenkins):**
+Replace the `trigger_workflow()` function in `ci/conversational_orchestrator.py` with a call to the provider's API. The rest of the skill (webhook server, event watching, RCA) is provider-agnostic.
+
+**Add a new event type:**
+1. POST the event from GitHub Actions using the `notify` composite action
+2. Add a row to `_STAGE_LABELS` and `_format_event()` in `conversational_orchestrator.py`
+3. Add the event description to `SKILL.md` Step 7's event table
 
 ---
 

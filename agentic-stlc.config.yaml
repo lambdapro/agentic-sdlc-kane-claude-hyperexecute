@@ -88,6 +88,38 @@ adapters:
   functional_testing: "kaneai"
   test_framework: "playwright"
 
+# ── Agentic STLC Skill Configuration ─────────────────────────────────────────
+# Settings for the Claude Code "agentic-stlc" skill (chat-first pipeline mode).
+# These values are read by ci/conversational_orchestrator.py and SKILL.md.
+skill:
+  # Branch the skill targets by default when the user says "execute tests"
+  product_branch: "product"
+
+  # GitHub owner/repo used for workflow dispatch and artifact download
+  github_repo: "lambdapro/agentic-stlc-kane-hyperexecute"
+
+  # On-demand workflow filename (must exist in .github/workflows/)
+  on_demand_workflow: "agentic-stlc-on-demand.yml"
+
+  # Local port for the webhook server (auto-increments if busy)
+  webhook_port: 8765
+
+  # External callback URL override — leave blank for automatic local server
+  # Set this when running behind a tunnel (e.g., ngrok, Cloudflare Tunnel)
+  callback_url: ""
+
+  # Auto-download CI artifacts to local reports/ after pipeline completes
+  artifact_download: true
+
+  # Maximum seconds to wait for a pipeline run before timing out
+  pipeline_timeout_s: 1800
+
+  # Requirements file written by the skill (overwritten on each skill run)
+  requirements_file: "requirements/search.txt"
+
+  # Whether to auto-run RCA immediately after pipeline completes
+  auto_rca: true
+
 # ── Multi-Agent / Multi-Model Configuration ───────────────────────────────────
 # Set enabled: true to activate multi-agent orchestration.
 # When false (default), existing pipeline behavior is 100% unchanged.

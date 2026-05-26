@@ -405,7 +405,7 @@ def main():
         emit(f"- **Overall health:** {result_analysis.get('overall_health', 'unknown')}")
         emit(f"- **Risk level:** {result_analysis.get('risk_level', 'unknown')}")
         emit(f"- **Kane AI pass rate:** {result_analysis.get('kane_pass_rate', 0)}%")
-        emit(f"- **Playwright pass rate:** {result_analysis.get('playwright_pass_rate', result_analysis.get('selenium_pass_rate', 0))}%")
+        emit(f"- **Playwright pass rate:** {result_analysis.get('playwright_pass_rate', 0)}%")
         emit("")
         for finding in result_analysis.get("key_findings", []):
             emit(f"- {finding}")

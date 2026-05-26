@@ -43,6 +43,10 @@ inputs:
     description: "Days to retain pipeline-reports artifact"
     required: false
     default: "30"
+  callback-url:
+    description: "Webhook URL to POST stage events to (skill event-driven mode)"
+    required: false
+    default: ""
 
 outputs:
   verdict:
@@ -54,6 +58,18 @@ outputs:
   quality-gates-passed:
     description: "true if all CRITICAL quality gates passed"
     value: ${{ steps.quality-gates.outputs.gates_passed }}
+  he-job-id:
+    description: "HyperExecute job ID"
+    value: ${{ steps.verdict.outputs.he_job_id }}
+  scenarios-new:
+    description: "Number of new scenarios created"
+    value: ${{ steps.verdict.outputs.scenarios_new }}
+  scenarios-updated:
+    description: "Number of updated scenarios"
+    value: ${{ steps.verdict.outputs.scenarios_updated }}
+  tests-selected:
+    description: "Number of tests selected for execution"
+    value: ${{ steps.verdict.outputs.tests_selected }}
 
 runs:
   using: "composite"
@@ -121,6 +137,7 @@ runs:
         FULL_RUN:           ${{ inputs.full-run }}
         AGENTIC_STLC_CONFIG: ${{ inputs.config-file }}
         RUN_URL:            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        SKILL_CALLBACK_URL: ${{ inputs.callback-url }}
       run: python ci/agent.py
 
     - name: "Generate pipeline metrics"
@@ -143,9 +160,32 @@ runs:
             pass_rate = data.get('pass_rate', 0)
         else:
             verdict, pass_rate = 'UNKNOWN', 0
+
+        # HE job ID
+        he_job_id = ""
+        api = Path('reports/api_details.json')
+        if api.exists():
+            he_job_id = json.loads(api.read_text()).get('he_job_id', '')
+
+        # Scenario stats
+        sc_new = sc_updated = tests_selected = 0
+        manifest = Path('reports/test_execution_manifest.json')
+        if manifest.exists():
+            m = json.loads(manifest.read_text())
+            tests_selected = len(m.get('tests', []))
+        sc_path = Path('scenarios/scenarios.json')
+        if sc_path.exists():
+            sc = json.loads(sc_path.read_text())
+            sc_new     = sum(1 for s in sc if s.get('status') == 'new')
+            sc_updated = sum(1 for s in sc if s.get('status') == 'updated')
+
         with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
             f.write(f"verdict={verdict}\n")
             f.write(f"pass_rate={pass_rate}\n")
+            f.write(f"he_job_id={he_job_id}\n")
+            f.write(f"scenarios_new={sc_new}\n")
+            f.write(f"scenarios_updated={sc_updated}\n")
+            f.write(f"tests_selected={tests_selected}\n")
         PYEOF
 
     - name: "Read quality gates result"
