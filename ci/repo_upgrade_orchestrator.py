@@ -58,7 +58,6 @@ _PIPELINE_CI_FILES = [
     "ci/analyze_requirements.py",
     "ci/agent.py",
     "ci/manage_scenarios.py",
-    "ci/generate_tests_from_scenarios.py",
     "ci/select_tests.py",
     "ci/build_traceability.py",
     "ci/release_recommendation.py",
