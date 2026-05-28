@@ -521,8 +521,9 @@ def main():
         cache_hit = False
     else:
         _configure_kane_project()
-        print(f"[Stage 1] Running KaneAI in parallel (workers=5, {len(criteria)} criteria) — code export enabled...")
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        workers = len(criteria) if criteria else 1
+        print(f"[Stage 1] Running KaneAI in parallel (workers={workers}, {len(criteria)} criteria) — code export enabled...")
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             results = list(executor.map(_run_kane_indexed, enumerate(criteria, start=1)))
         cache_hit = False
 
@@ -581,7 +582,7 @@ def main():
 
     print_stage_result("1", "ANALYZE_REQUIREMENTS", {
         "Requirements parsed":  len(analyzed),
-        "Criteria analyzed":    f"{len(analyzed)} ({mode_label}, workers=5)",
+        "Criteria analyzed":    f"{len(analyzed)} ({mode_label}, workers={len(criteria) if criteria else 1})",
         "Kane passed":          f"{passed_count}/{len(analyzed)}",
         "Kane failed":          failed_count,
         "Pass rate":            f"{round(passed_count / len(analyzed) * 100, 1) if analyzed else 0}%",

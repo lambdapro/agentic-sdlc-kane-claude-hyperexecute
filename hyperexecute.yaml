@@ -8,7 +8,7 @@ runson: linux
 autosplit: true
 retryOnFailure: true
 maxRetries: 1
-concurrency: 5
+concurrency: 15
 
 # BROWSERS drives pytest parametrize in conftest.py — no HyperExecute matrix needed.
 # Each test function runs once per browser listed here.
