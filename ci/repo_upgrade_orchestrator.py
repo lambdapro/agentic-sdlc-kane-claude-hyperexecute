@@ -61,13 +61,20 @@ def _slug(text: str) -> str:
 # Git + GitHub helpers
 # ---------------------------------------------------------------------------
 
+def _clean_env() -> dict:
+    """Return os.environ without GH_TOKEN so gh uses keyring auth."""
+    env = {**os.environ}
+    env.pop("GH_TOKEN", None)
+    return env
+
+
 def _run(cmd: list[str], cwd: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
     print(f"[orchestrator] $ {' '.join(cmd)}")
-    return subprocess.run(cmd, cwd=cwd, check=check, capture_output=False)
+    return subprocess.run(cmd, cwd=cwd, check=check, capture_output=False, env=_clean_env())
 
 
 def _run_capture(cmd: list[str], cwd: str | None = None) -> str:
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=_clean_env())
     return result.stdout.strip()
 
 
@@ -83,7 +90,9 @@ def clone_repo(repo_url: str, workspace_dir: str) -> str:
         _run(["git", "fetch", "origin"], cwd=str(clone_path))
     else:
         clone_path.parent.mkdir(parents=True, exist_ok=True)
-        _run(["gh", "repo", "clone", repo_url, str(clone_path)])
+        # core.longpaths=true avoids Windows 260-char path failures on repos
+        # that have long log or artifact filenames checked in.
+        _run(["git", "clone", "-c", "core.longpaths=true", repo_url, str(clone_path)])
     return str(clone_path)
 
 
@@ -101,7 +110,7 @@ def commit_and_push(workspace_path: str, branch: str, message: str) -> str:
     _run(["git", "commit", "-m", message], cwd=workspace_path)
     _run(["git", "push", "origin", branch, "--force-with-lease"], cwd=workspace_path)
     sha = _run_capture(["git", "rev-parse", "HEAD"], cwd=workspace_path)
-    print(f"[orchestrator] pushed {branch} → {sha[:8]}")
+    print(f"[orchestrator] pushed {branch} -> {sha[:8]}")
     return sha
 
 
@@ -282,7 +291,7 @@ def cmd_inject(args: argparse.Namespace, config: dict) -> str:
     rca_dest.parent.mkdir(parents=True, exist_ok=True)
     src = Path(__file__).parent / "rca_parser.py"
     rca_dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-    print(f"[orchestrator] copied rca_parser.py → {rca_dest.relative_to(workspace_path)}")
+    print(f"[orchestrator] copied rca_parser.py -> {rca_dest.relative_to(workspace_path)}")
 
     # Commit and push
     print("\n[Stage H] Committing and pushing...")
@@ -295,7 +304,7 @@ def cmd_inject(args: argparse.Namespace, config: dict) -> str:
         f"Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>",
     )
 
-    print(f"\n[orchestrator] inject complete → branch: {branch}")
+    print(f"\n[orchestrator] inject complete -> branch: {branch}")
     print(f"  TestMD: {testmd_files}")
     print(f"  Tests:  {modified_tests}")
     return workspace_path
@@ -324,7 +333,7 @@ def cmd_run(args: argparse.Namespace, config: dict) -> None:
     print(f"\n  Monitor: {monitor_url}")
 
     # Stage J: Watch until completion
-    print("\n[Stage J] Watching pipeline (Kane → HyperExecute → RCA)...")
+    print("\n[Stage J] Watching pipeline (Kane -> HyperExecute -> RCA)...")
     exit_code = watch_run(profile.owner, profile.name, run_id)
 
     # Stage K: Download artifacts

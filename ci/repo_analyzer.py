@@ -39,10 +39,13 @@ class RepoProfile:
 
 def _gh_api(path: str) -> dict | list | None:
     """Call gh api and return parsed JSON, or None on error."""
+    import os
+    env = {**os.environ}
+    env.pop("GH_TOKEN", None)   # ignore stale/bad GH_TOKEN; use keyring auth
     try:
         result = subprocess.run(
             ["gh", "api", path],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=30, env=env,
         )
         if result.returncode != 0:
             return None
@@ -85,8 +88,13 @@ def _find_files(owner: str, name: str, search_path: str, pattern: str) -> list[s
     return results
 
 
+def _p(work_dir: str, filename: str) -> str:
+    """Build a repo-relative path, avoiding a leading slash when work_dir is empty."""
+    return f"{work_dir}/{filename}" if work_dir else filename
+
+
 def _detect_package_manager(owner: str, name: str, work_dir: str) -> str:
-    items = _gh_list(owner, name, work_dir)
+    items = _gh_list(owner, name, work_dir if work_dir else "")
     names = {i["name"] for i in items if i.get("type") == "file"}
     if "pnpm-lock.yaml" in names:
         return "pnpm"
@@ -99,7 +107,7 @@ def _detect_package_manager(owner: str, name: str, work_dir: str) -> str:
 
 def _detect_framework_and_start(owner: str, name: str, work_dir: str) -> tuple[str, str, str, int]:
     """Returns (framework, start_cmd, build_cmd, port)."""
-    pkg_content = _gh_file(owner, name, f"{work_dir}/package.json")
+    pkg_content = _gh_file(owner, name, _p(work_dir, "package.json"))
     if not pkg_content:
         return "unknown", "npm start", "npm run build", 3000
     try:
@@ -138,18 +146,55 @@ def _detect_framework_and_start(owner: str, name: str, work_dir: str) -> tuple[s
 def _detect_playwright_config(owner: str, name: str, work_dir: str) -> tuple[str, int, list[str]]:
     """Returns (playwright_config_path, port, lt_project_names)."""
     for filename in ("playwright.config.ts", "playwright.config.js"):
-        content = _gh_file(owner, name, f"{work_dir}/{filename}")
+        content = _gh_file(owner, name, _p(work_dir, filename))
         if content:
-            config_path = f"{work_dir}/{filename}"
-            # Extract baseURL port
+            config_path = _p(work_dir, filename)
             port = 3000
             m = re.search(r"localhost[:/](\d{4,5})", content)
             if m:
                 port = int(m.group(1))
-            # Extract LambdaTest project names
             lt_projects = re.findall(r"['\"]([^'\"]+@lambdatest)['\"]", content)
             return config_path, port, lt_projects
     return "", 3000, []
+
+
+def _find_playwright_workspace(owner: str, name: str, default_branch: str) -> str:
+    """
+    Find the directory containing playwright.config.ts anywhere in the repo.
+    Strategy 1: git tree API (fast, single call, may be truncated for large repos).
+    Strategy 2: BFS directory walk up to 3 levels deep (used when tree is truncated).
+    Returns the directory path (empty string = repo root).
+    """
+    # Strategy 1: full git tree
+    data = _gh_api(f"repos/{owner}/{name}/git/trees/{default_branch}?recursive=1")
+    if data and isinstance(data, dict):
+        for item in data.get("tree", []):
+            path = item.get("path", "")
+            if path.endswith("playwright.config.ts") or path.endswith("playwright.config.js"):
+                parts = path.rsplit("/", 1)
+                return parts[0] if len(parts) > 1 else ""
+        if not data.get("truncated"):
+            return ""  # not truncated → playwright config genuinely absent
+        # Tree was truncated — fall through to BFS
+
+    # Strategy 2: BFS directory scan (handles truncated trees from large repos)
+    pw_names = {"playwright.config.ts", "playwright.config.js"}
+    root_items = _gh_list(owner, name, "")
+    for item in root_items:
+        if item.get("type") == "file" and item.get("name") in pw_names:
+            return ""  # root
+        if item.get("type") != "dir":
+            continue
+        sub_items = _gh_list(owner, name, item["path"])
+        for sub in sub_items:
+            if sub.get("type") == "file" and sub.get("name") in pw_names:
+                return item["path"]
+            if sub.get("type") == "dir":
+                deep = _gh_list(owner, name, sub["path"])
+                for d in deep:
+                    if d.get("type") == "file" and d.get("name") in pw_names:
+                        return sub["path"]
+    return ""
 
 
 def _find_app_working_dir(owner: str, name: str) -> str:
@@ -234,14 +279,12 @@ def _find_he_config(owner: str, name: str, work_dir: str) -> tuple[str, str]:
 
 def _detect_node_version(owner: str, name: str, work_dir: str) -> str:
     for f in (".nvmrc", ".node-version"):
-        path = f"{work_dir}/{f}" if work_dir else f
-        content = _gh_file(owner, name, path)
+        content = _gh_file(owner, name, _p(work_dir, f))
         if content:
             v = content.strip().lstrip("v").split(".")[0]
             if v.isdigit():
                 return v
-    # Check package.json engines
-    pkg_content = _gh_file(owner, name, f"{work_dir}/package.json" if work_dir else "package.json")
+    pkg_content = _gh_file(owner, name, _p(work_dir, "package.json"))
     if pkg_content:
         try:
             pkg = json.loads(pkg_content)
@@ -274,9 +317,12 @@ def analyze(repo_url: str, target_url: str = "") -> RepoProfile:
 
     print(f"[repo_analyzer] Analyzing {owner}/{name} (branch: {default_branch})")
 
-    # Detect app working directory
-    work_dir = _find_app_working_dir(owner, name)
-    print(f"[repo_analyzer] app_working_dir={work_dir!r}")
+    # Detect app working directory:
+    # Prefer the directory that contains playwright.config.ts (the actual test workspace).
+    # Fall back to the directory that has the frontend package.json.
+    pw_workspace = _find_playwright_workspace(owner, name, default_branch)
+    work_dir = pw_workspace if pw_workspace else _find_app_working_dir(owner, name)
+    print(f"[repo_analyzer] app_working_dir={work_dir!r} (playwright_workspace={pw_workspace!r})")
 
     # Package manager
     pkg_mgr = _detect_package_manager(owner, name, work_dir)

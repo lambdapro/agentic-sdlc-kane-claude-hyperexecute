@@ -191,7 +191,7 @@ def _build_workflow(
                   python-version: '3.11'
 
               - name: Install RCA dependencies (MCP + HTTP)
-                run: pip install mcp httpx httpx-sse
+                run: pip3 install mcp httpx httpx-sse PyYAML
 
               - name: Download Kane results
                 uses: actions/download-artifact@v4
@@ -209,7 +209,7 @@ def _build_workflow(
 
               - name: Run RCA parser (with LambdaTest MCP enrichment)
                 run: |
-                  python ci/rca_parser.py \\
+                  python3 ci/rca_parser.py \\
                     --kane artifacts/kane-results/ \\
                     --playwright artifacts/playwright-reports/ \\
                     --output artifacts/rca_result.json \\
