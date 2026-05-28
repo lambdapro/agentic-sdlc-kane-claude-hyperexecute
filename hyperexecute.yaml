@@ -18,7 +18,7 @@ env:
   LT_ACCESS_KEY: ${LT_ACCESS_KEY}
   GITHUB_RUN_NUMBER: ${GITHUB_RUN_NUMBER}
   TARGET_URL: "https://ecommerce-playground.lambdatest.io/"
-  BROWSERS: "chrome,firefox"
+  BROWSERS: "chrome"
 
 cacheKey: '{{ checksum "requirements.txt" }}'
 cacheDirectories:

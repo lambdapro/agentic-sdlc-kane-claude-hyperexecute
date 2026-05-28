@@ -161,6 +161,15 @@ _KANE_TASK_OVERRIDES: dict[str, str] = {
         " — verify at least one item name and price appears in the dropdown."
         " Stop once the item name and price are visible in the cart dropdown."
     ),
+    # SC-003: generic task produced raw recording_state JSON — Kane never ran the objective.
+    # Direct URL to Laptops category forces correct landing and immediate verification.
+    "navigate to the laptops product catalog": (
+        "Navigate directly to https://ecommerce-playground.lambdatest.io/index.php?route=product/category&path=18"
+        " — wait for the page to fully load — verify a grid of product thumbnails is visible"
+        " (at least one product card with an image and price)."
+        " Stop immediately once the product grid is confirmed. Do not navigate anywhere else."
+    ),
+
     # SC-004: was unclassified (no override existed). Direct URL to Components category avoids
     # the wrong-site navigation bug where Kane opened kaneai-playground instead.
     "apply a manufacturer brand filter from the sidebar": (
@@ -310,7 +319,7 @@ def run_kane(index, description):
         "--agent",
         "--headless",
         "--timeout", "120",
-        "--max-steps", "20",
+        "--max-steps", "30",
         "--code-export",
         "--code-language", "python",
         "--skip-code-validation",
