@@ -54,10 +54,12 @@ hyperexecute:
 
 kaneai:
   enabled: true
-  parallel_workers: 5
+  parallel_workers: 10          # default: 10 parallel Kane CLI workers
   timeout_seconds: 120
   project_id: "01J2VAWPNBPA21T0BW44JW026X"
   folder_id: "01KPD0NC5ZXZD9EXB23QCATTG2"
+  use_testmd: true              # use kane-cli testmd run (persistent docs + replay cache)
+  testmd_output_dir: "kane/testmd"
 
 reporting:
   output_dir: "reports"
@@ -80,6 +82,20 @@ quality_gates:
   confidence:
     enabled: true
     gate_severity: "WARNING"
+
+# ── Repo Upgrade Skill Configuration ─────────────────────────────────────────
+# Settings for the "repo-upgrade" skill that upgrades any GitHub repo.
+repo_upgrade:
+  workspace_dir: "workspace"           # local directory for cloned target repos
+  branch_prefix: "feature/agentic-"   # prefix for generated feature branches
+  he_config_name: "hyperexecute-agentic.yaml"
+  gha_workflow_name: "agentic-validate.yml"
+  default_node_version: "18"
+  wait_on_timeout_ms: 60000            # ms to wait for app to start in GHA
+  he_browsers:                         # default browser matrix for HyperExecute
+    - chrome:latest:Windows10@lambdatest
+    - MicrosoftEdge:latest:Windows10@lambdatest
+    - pw-firefox:latest@lambdatest
 
 adapters:
   git: "github"

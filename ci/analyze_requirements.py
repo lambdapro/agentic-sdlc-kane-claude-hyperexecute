@@ -530,7 +530,7 @@ def main():
         cache_hit = False
     else:
         _configure_kane_project()
-        workers = len(criteria) if criteria else 1
+        workers = min(int(os.getenv("KANE_PARALLEL_WORKERS", 10)), len(criteria)) if criteria else 1
         print(f"[Stage 1] Running KaneAI in parallel (workers={workers}, {len(criteria)} criteria) — code export enabled...")
         with ThreadPoolExecutor(max_workers=workers) as executor:
             results = list(executor.map(_run_kane_indexed, enumerate(criteria, start=1)))
