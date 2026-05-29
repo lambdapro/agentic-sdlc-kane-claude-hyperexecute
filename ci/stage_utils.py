@@ -3,6 +3,10 @@
 import sys
 from datetime import datetime, timezone
 
+# Ensure UTF-8 output on Windows (cp1252 can't encode box-drawing chars).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 def print_stage_result(
     stage_num: str,

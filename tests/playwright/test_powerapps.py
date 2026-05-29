@@ -99,8 +99,8 @@ def test_sc_007_searched_for_an_iphone_on_ecommerce_playground_lam(page):
 
 @pytest.mark.scenario("SC-008")
 @pytest.mark.requirement("AC-008")
-def test_sc_008_sc_008(page):
-    """SC-008: SC-008."""
+def test_sc_008_registration_form_shows_required_fields_on_registe(page):
+    """SC-008: registration form shows required fields on register page."""
     page.goto("https://ecommerce-playground.lambdatest.io/index.php?route=account/register")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     first_name = page.locator("#input-firstname")
@@ -113,8 +113,8 @@ def test_sc_008_sc_008(page):
 
 @pytest.mark.scenario("SC-009")
 @pytest.mark.requirement("AC-009")
-def test_sc_009_sc_009(page):
-    """SC-009: SC-009."""
+def test_sc_009_login_with_registered_email_lands_on_account_dashb(page):
+    """SC-009: login with registered email lands on account dashboard."""
     page.goto("https://ecommerce-playground.lambdatest.io/index.php?route=account/login")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     email_field = page.locator("#input-email")
@@ -126,8 +126,8 @@ def test_sc_009_sc_009(page):
 
 @pytest.mark.scenario("SC-010")
 @pytest.mark.requirement("AC-010")
-def test_sc_010_sc_010(page):
-    """SC-010: SC-010."""
+def test_sc_010_logout_from_account_redirects_to_the_home_page(page):
+    """SC-010: logout from account redirects to the home page."""
     page.goto("https://ecommerce-playground.lambdatest.io/")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     my_account = page.locator("#top .dropdown-toggle, a:has-text('My account')")
@@ -140,8 +140,8 @@ def test_sc_010_sc_010(page):
 
 @pytest.mark.scenario("SC-011")
 @pytest.mark.requirement("AC-011")
-def test_sc_011_sc_011(page):
-    """SC-011: SC-011."""
+def test_sc_011_remove_item_from_shopping_cart_and_see_cart_empty(page):
+    """SC-011: remove item from shopping cart and see cart empty."""
     page.goto("https://ecommerce-playground.lambdatest.io/index.php?route=product/product&product_id=28")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     add_btn = page.locator("#button-cart")
@@ -159,8 +159,8 @@ def test_sc_011_sc_011(page):
 
 @pytest.mark.scenario("SC-012")
 @pytest.mark.requirement("AC-012")
-def test_sc_012_sc_012(page):
-    """SC-012: SC-012."""
+def test_sc_012_update_cart_quantity_and_see_line_total_recalculate(page):
+    """SC-012: update cart quantity and see line total recalculate."""
     page.goto("https://ecommerce-playground.lambdatest.io/index.php?route=product/product&product_id=28")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     page.locator("#button-cart").wait_for(timeout=15000)
@@ -179,8 +179,8 @@ def test_sc_012_sc_012(page):
 
 @pytest.mark.scenario("SC-013")
 @pytest.mark.requirement("AC-013")
-def test_sc_013_sc_013(page):
-    """SC-013: SC-013."""
+def test_sc_013_sort_products_by_price_low_to_high_changes_listing(page):
+    """SC-013: sort products by price low to high changes listing order."""
     page.goto("https://ecommerce-playground.lambdatest.io/index.php?route=product/category&path=20")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     sort_select = page.locator("#input-sort")
@@ -193,8 +193,8 @@ def test_sc_013_sc_013(page):
 
 @pytest.mark.scenario("SC-014")
 @pytest.mark.requirement("AC-014")
-def test_sc_014_sc_014(page):
-    """SC-014: SC-014."""
+def test_sc_014_add_product_to_wish_list_from_detail_page_and_view(page):
+    """SC-014: add product to wish list from detail page and view it."""
     page.goto("https://ecommerce-playground.lambdatest.io/index.php?route=product/product&product_id=40")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     product_name = page.locator("h1").first
@@ -207,8 +207,8 @@ def test_sc_014_sc_014(page):
 
 @pytest.mark.scenario("SC-015")
 @pytest.mark.requirement("AC-015")
-def test_sc_015_sc_015(page):
-    """SC-015: SC-015."""
+def test_sc_015_complete_guest_checkout_with_shipping_address_and_f(page):
+    """SC-015: complete guest checkout with shipping address and flat rate."""
     page.goto("https://ecommerce-playground.lambdatest.io/index.php?route=product/product&product_id=28")
     page.wait_for_load_state("domcontentloaded", timeout=30000)
     page.locator("#button-cart").wait_for(timeout=15000)

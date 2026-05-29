@@ -141,6 +141,8 @@
   {
     "id": "SC-008",
     "requirement_id": "AC-008",
+    "title": "registration form shows required fields on register page",
+    "function_name": "test_sc_008_registration_form_shows_required_fields_on_registe",
     "description": "User can register a new account by filling in first name last name email telephone and password fields",
     "feature": "AUTH",
     "status": "active",
@@ -150,6 +152,8 @@
   {
     "id": "SC-009",
     "requirement_id": "AC-009",
+    "title": "login with registered email lands on account dashboard",
+    "function_name": "test_sc_009_login_with_registered_email_lands_on_account_dashb",
     "description": "User can log in with a registered email address and password and land on the account dashboard",
     "feature": "AUTH",
     "status": "active",
@@ -159,6 +163,8 @@
   {
     "id": "SC-010",
     "requirement_id": "AC-010",
+    "title": "logout from account redirects to the home page",
+    "function_name": "test_sc_010_logout_from_account_redirects_to_the_home_page",
     "description": "User can log out from the account and be redirected to the home page",
     "feature": "GENERAL",
     "status": "active",
@@ -168,6 +174,8 @@
   {
     "id": "SC-011",
     "requirement_id": "AC-011",
+    "title": "remove item from shopping cart and see cart empty",
+    "function_name": "test_sc_011_remove_item_from_shopping_cart_and_see_cart_empty",
     "description": "User can remove an item from the shopping cart and see the cart update with the item gone",
     "feature": "CART",
     "status": "active",
@@ -177,6 +185,8 @@
   {
     "id": "SC-012",
     "requirement_id": "AC-012",
+    "title": "update cart quantity and see line total recalculate",
+    "function_name": "test_sc_012_update_cart_quantity_and_see_line_total_recalculate",
     "description": "User can update the quantity of an item in the shopping cart and see the line total recalculate",
     "feature": "CART",
     "status": "active",
@@ -186,6 +196,8 @@
   {
     "id": "SC-013",
     "requirement_id": "AC-013",
+    "title": "sort products by price low to high changes listing order",
+    "function_name": "test_sc_013_sort_products_by_price_low_to_high_changes_listing",
     "description": "User can sort products by price low to high and see the listing order change",
     "feature": "CHECKOUT",
     "status": "active",
@@ -195,6 +207,8 @@
   {
     "id": "SC-014",
     "requirement_id": "AC-014",
+    "title": "add product to wish list from detail page and view it",
+    "function_name": "test_sc_014_add_product_to_wish_list_from_detail_page_and_view",
     "description": "User can add a product to the wish list from the product detail page and view it in the wishlist",
     "feature": "PRODUCT_DETAIL",
     "status": "active",
@@ -204,6 +218,8 @@
   {
     "id": "SC-015",
     "requirement_id": "AC-015",
+    "title": "complete guest checkout with shipping address and flat rate",
+    "function_name": "test_sc_015_complete_guest_checkout_with_shipping_address_and_f",
     "description": "User can complete a guest checkout by entering a shipping address and selecting flat rate shipping",
     "feature": "CHECKOUT",
     "status": "active",
