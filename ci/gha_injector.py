@@ -156,10 +156,14 @@ def _build_workflow(
                   npm install -g @testmuai/kane-cli
 
               - name: Configure Kane CLI
-                if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo_mode != 'true' && '{kane_project_id}' != ''
+                if: steps.kane-cache.outputs.cache-hit != 'true' && inputs.demo_mode != 'true'
                 run: |
-                  kane-cli config project {kane_project_id}
-                  kane-cli config folder  {kane_folder_id}
+                  kane-cli login --username ${{{{ secrets.LT_USERNAME }}}} --access-key ${{{{ secrets.LT_ACCESS_KEY }}}}
+                  {f'kane-cli config project {kane_project_id}' if kane_project_id else '# no project_id configured'}
+                  {f'kane-cli config folder  {kane_folder_id}' if kane_folder_id else '# no folder_id configured'}
+                env:
+                  LT_USERNAME:   ${{{{ secrets.LT_USERNAME }}}}
+                  LT_ACCESS_KEY: ${{{{ secrets.LT_ACCESS_KEY }}}}
 
               - name: Run KaneAI (demo mode)
                 if: inputs.demo_mode == 'true'
