@@ -9,16 +9,27 @@ import pytest
 from playwright.sync_api import sync_playwright
 
 # LambdaTest browser map: browser key → (Playwright launcher attr, LT browserName capability)
-# LambdaTest now requires playwright.browser.connect() (Playwright wire protocol), NOT
-# connect_over_cdp() which produces "Browser.getVersion: undefined" errors.
-# With connect(), use standard LambdaTest browser names (Chrome, Firefox, etc.).
-# Android routes to a real LambdaTest Android device; the HE runner stays Linux.
+#
+# ALL LambdaTest Playwright connections use chromium.connect() regardless of browser.
+# LambdaTest abstracts browser type via the browserName capability:
+#   "Chrome"        → Chrome on Windows/macOS/Linux
+#   "MicrosoftEdge" → Edge on Windows
+#   "pw-firefox"    → Firefox (LambdaTest spawns it, returns PW Firefox protocol)
+#   "pw-webkit"     → WebKit / Safari
+#   "pw-chromium"   → Headless Chromium
+#
+# This matches the LambdaTest lambda.setup.ts convention where project names like
+# "pw-firefox:latest:Windows 10@lambdatest" are parsed into capabilities.
 _BROWSER_MAP = {
-    "chrome":   ("chromium", "Chrome"),
-    "firefox":  ("firefox",  "Firefox"),
-    "edge":     ("chromium", "MicrosoftEdge"),
-    "safari":   ("webkit",   "Safari"),
-    "android":  ("chromium", "Chrome"),
+    "chrome":       ("chromium", "Chrome"),
+    "firefox":      ("chromium", "pw-firefox"),
+    "pw-firefox":   ("chromium", "pw-firefox"),
+    "edge":         ("chromium", "MicrosoftEdge"),
+    "safari":       ("chromium", "pw-webkit"),
+    "webkit":       ("chromium", "pw-webkit"),
+    "pw-webkit":    ("chromium", "pw-webkit"),
+    "pw-chromium":  ("chromium", "pw-chromium"),
+    "android":      ("chromium", "Chrome"),
 }
 
 # Platform overrides per browser key (defaults to "Windows 10")
@@ -112,20 +123,17 @@ def page(request):
     except Exception:
         pass
 
-    # Project label: prefer AGENTIC_PROJECT_NAME env var, fall back to generic label
+    # Project label: prefer AGENTIC_PROJECT_NAME env var
     project_label = os.environ.get("AGENTIC_PROJECT_NAME", "Agentic STLC")
 
-    # Local mode: if TARGET_URL is localhost or LT credentials are absent,
-    # run tests directly on the HE VM browser (no LambdaTest CDP connection).
-    # HyperExecute tunnel exposes the VM's localhost to LambdaTest cloud, but
-    # the Playwright test itself connects via the local browser, not CDP.
-    target_url = os.environ.get("TARGET_URL", "")
-    local_mode = (
-        not lt_username
-        or not lt_access_key
-        or "localhost" in target_url
-        or "127.0.0.1" in target_url
-    )
+    # Local mode: run against local browser only when LT credentials are absent.
+    # When credentials ARE present (HyperExecute + tunnel), always use LambdaTest
+    # CDP — the HE tunnel exposes localhost to the LambdaTest cloud browser.
+    local_mode = not lt_username or not lt_access_key
+
+    # Tunnel support: HyperExecute sets HYPEREXECUTE_TUNNEL_NAME when tunnel:true.
+    tunnel_name = os.environ.get("HYPEREXECUTE_TUNNEL_NAME", "")
+    use_tunnel = bool(tunnel_name)
 
     platform = _PLATFORM_MAP.get(browser_key, "Windows 10")
     lt_options: dict = {
@@ -135,10 +143,12 @@ def page(request):
         "project": project_label,
         "user": lt_username,
         "accessKey": lt_access_key,
-        "video": True,
-        "visual": True,
         "network": True,
+        "video": True,
         "console": True,
+        "tunnel": use_tunnel,
+        "tunnelName": tunnel_name,
+        "geoLocation": "",
     }
     if pw_version:
         lt_options["playwrightClientVersion"] = pw_version
@@ -150,7 +160,9 @@ def page(request):
         "browserVersion": "latest",
         "LT:Options": lt_options,
     }
-    cdp_url = (
+
+    # wsEndpoint format matches lambda.setup.ts — chromium.connect({wsEndpoint: ...})
+    ws_endpoint = (
         f"wss://cdp.lambdatest.com/playwright"
         f"?capabilities={urllib.parse.quote(json.dumps(capabilities))}"
     )
@@ -159,14 +171,14 @@ def page(request):
     start_mono = time.monotonic()
 
     with sync_playwright() as p:
-        launcher = getattr(p, playwright_launcher)
         if local_mode:
-            # Run tests on the HE VM's local browser — no LambdaTest CDP.
-            # HyperExecute tunnel still exposes localhost to LT for recording.
+            # No LT credentials — run locally (developer machine / CI without LT secrets)
+            launcher = getattr(p, playwright_launcher)
             browser = launcher.launch(headless=True)
         else:
-            # LambdaTest requires Playwright wire-protocol connect(), not connect_over_cdp().
-            browser = launcher.connect(cdp_url)
+            # LambdaTest: always use chromium.connect() — LT handles browser type
+            # via the browserName capability (pw-firefox, pw-webkit, Chrome, Edge…)
+            browser = p.chromium.connect(ws_endpoint)
         context = browser.new_context()
         pw_page = context.new_page()
 
@@ -195,10 +207,19 @@ def page(request):
         if rep and rep.failed and hasattr(rep, "longrepr"):
             error_message = str(rep.longrepr)[:500]
 
-        try:
-            pw_page.evaluate(f"() => {{ window['lambda-status'] = '{status}'; }}")
-        except Exception:
-            pass
+        # Report test status to LambdaTest (mirrors lambda.setup.ts setTestStatus action)
+        if not local_mode:
+            try:
+                lt_action = json.dumps({
+                    "action": "setTestStatus",
+                    "arguments": {
+                        "status": status,
+                        "remark": error_message or "",
+                    },
+                })
+                pw_page.evaluate(f"_ => {{}}", f"lambdatest_action: {lt_action}")
+            except Exception:
+                pass
 
         tc_id = f"TC-{scenario_id.split('-')[1]}" if "-" in scenario_id else "TC-000"
 
