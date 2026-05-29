@@ -552,6 +552,17 @@ def _copy_support_files(dest_agentic: Path) -> None:
 
 
 def _write_hyperexecute_yaml(dest_agentic: Path, profile: repo_analyzer.RepoProfile) -> None:
+    """
+    Write .agentic/hyperexecute.yaml adapted for the target repo.
+
+    Local mode (kane_mode == 'local' or TARGET_URL contains localhost):
+      - tunnel: true  so LambdaTest cloud browsers reach the HE VM via LT tunnel
+      - pre: starts the React app on the HE VM before tests run
+      - playwright install uses --with-deps for system dependency coverage
+
+    Cloud mode (deployed TARGET_URL):
+      - No tunnel, no app startup — cloud browser navigates directly to the URL.
+    """
     src = _REPO_ROOT / "hyperexecute.yaml"
     if not src.exists():
         print("  [warn] hyperexecute.yaml not found in orchestration repo")
@@ -559,10 +570,62 @@ def _write_hyperexecute_yaml(dest_agentic: Path, profile: repo_analyzer.RepoProf
 
     content = src.read_text(encoding="utf-8")
 
-    # Point TARGET_URL at the target app
     target_url = profile.target_url or profile.app_url_local or ""
+    local_mode = (
+        profile.kane_mode == "local"
+        or "localhost" in target_url
+        or not profile.target_url
+    )
+
+    # Point TARGET_URL at the target app
     if target_url:
         content = re.sub(r'TARGET_URL:.*', f'TARGET_URL: "{target_url}"', content)
+
+    # Upgrade playwright install to include system deps
+    content = content.replace(
+        "playwright install chromium firefox webkit",
+        "playwright install chromium --with-deps",
+    ).replace(
+        "playwright install chromium firefox",
+        "playwright install chromium --with-deps",
+    )
+
+    if local_mode:
+        # Add tunnel: true after runson line (if not already present)
+        if "tunnel: true" not in content:
+            content = re.sub(
+                r"(runson:.*\n)",
+                r"\1tunnel: true\n",
+                content,
+                count=1,
+            )
+
+        # Inject app startup commands into pre block
+        wd = profile.app_working_dir or "."
+        install_cmd = profile.install_cmd or "npm ci"
+        start_cmd = profile.start_cmd or "npm start"
+        port = profile.app_port or 3000
+
+        app_pre = (
+            f"  - cd ../{wd} && {install_cmd}\n"
+            f"  - (cd ../{wd} && {start_cmd} &)\n"
+            f"  - npx wait-on http://localhost:{port} --timeout 60000\n"
+        )
+        # Insert app startup right before playwright install (after pip install)
+        if "playwright install" in content:
+            content = re.sub(
+                r"(  - playwright install)",
+                app_pre + r"\1",
+                content,
+                count=1,
+            )
+        else:
+            # Append to pre block
+            content = re.sub(
+                r"(pre:\n)((?:  -.*\n)*)",
+                r"\1\2" + app_pre,
+                content,
+            )
 
     # Update job labels for the target repo
     repo_label = profile.name.lower()
@@ -574,7 +637,7 @@ def _write_hyperexecute_yaml(dest_agentic: Path, profile: repo_analyzer.RepoProf
     )
 
     (dest_agentic / "hyperexecute.yaml").write_text(content, encoding="utf-8")
-    print("  wrote .agentic/hyperexecute.yaml")
+    print(f"  wrote .agentic/hyperexecute.yaml  (local_mode={local_mode}, tunnel={local_mode})")
 
 
 def _write_agentic_config(

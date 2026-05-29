@@ -102,12 +102,37 @@ def page(request):
     build = _build_name()
     session_name = _session_name(request, browser_key)
 
+    # Detect Playwright version for capabilities (required by LambdaTest)
+    pw_version = ""
+    try:
+        import subprocess as _sp
+        _r = _sp.run(["playwright", "--version"], capture_output=True, text=True, check=False)
+        _parts = _r.stdout.strip().split()
+        pw_version = _parts[1] if len(_parts) >= 2 else ""
+    except Exception:
+        pass
+
+    # Project label: prefer AGENTIC_PROJECT_NAME env var, fall back to generic label
+    project_label = os.environ.get("AGENTIC_PROJECT_NAME", "Agentic STLC")
+
+    # Local mode: if TARGET_URL is localhost or LT credentials are absent,
+    # run tests directly on the HE VM browser (no LambdaTest CDP connection).
+    # HyperExecute tunnel exposes the VM's localhost to LambdaTest cloud, but
+    # the Playwright test itself connects via the local browser, not CDP.
+    target_url = os.environ.get("TARGET_URL", "")
+    local_mode = (
+        not lt_username
+        or not lt_access_key
+        or "localhost" in target_url
+        or "127.0.0.1" in target_url
+    )
+
     platform = _PLATFORM_MAP.get(browser_key, "Windows 10")
     lt_options: dict = {
         "platform": platform,
         "build": build,
         "name": session_name,
-        "project": "Agentic STLC — Ecommerce Playground",
+        "project": project_label,
         "user": lt_username,
         "accessKey": lt_access_key,
         "video": True,
@@ -115,6 +140,8 @@ def page(request):
         "network": True,
         "console": True,
     }
+    if pw_version:
+        lt_options["playwrightClientVersion"] = pw_version
     if browser_key == "android":
         lt_options.update(_ANDROID_EXTRA)
 
@@ -133,8 +160,13 @@ def page(request):
 
     with sync_playwright() as p:
         launcher = getattr(p, playwright_launcher)
-        # LambdaTest requires Playwright wire-protocol connect(), not connect_over_cdp().
-        browser = launcher.connect(cdp_url)
+        if local_mode:
+            # Run tests on the HE VM's local browser — no LambdaTest CDP.
+            # HyperExecute tunnel still exposes localhost to LT for recording.
+            browser = launcher.launch(headless=True)
+        else:
+            # LambdaTest requires Playwright wire-protocol connect(), not connect_over_cdp().
+            browser = launcher.connect(cdp_url)
         context = browser.new_context()
         pw_page = context.new_page()
 
