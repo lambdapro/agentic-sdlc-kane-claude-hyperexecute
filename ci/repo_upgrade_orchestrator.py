@@ -1,26 +1,42 @@
 """
 Main orchestrator for the Repo Upgrade + Autonomous Validation Skill.
 
-All Agentic STLC pipeline files are injected into .agentic/ inside the target
-repo so the project's own source tree is never modified.
+Creates a fully self-contained local workspace at agentic-stlc/ and injects
+the complete Agentic STLC pipeline into any GitHub repo's .agentic/ folder.
 
-The .agentic/ folder contains:
-  ci/                           <- All 25 pipeline Python scripts
-  requirements.txt              <- Python deps (mcp, httpx, playwright, pytest...)
-  pytest.ini
-  hyperexecute.yaml             <- Adapted for target app URL
-  agentic-stlc.config.yaml     <- Adapted for target repo
-  requirements/search.txt      <- The business requirement (input to pipeline)
-  scenarios/scenarios.json     <- Empty; populated by pipeline Stage 2
-  tests/playwright/conftest.py <- LambdaTest Playwright fixture
+LOCAL WORKSPACE STRUCTURE (created before any clone):
+  agentic-stlc/
+  ├── {repo-name}/              <- cloned target repo
+  │   ├── .agentic/             <- complete pipeline (CI scripts + config + state)
+  │   └── .github/workflows/   <- injected agentic-stlc.yml
+  ├── ci/                       <- ALL pipeline + skill scripts (local copy)
+  ├── templates/
+  │   ├── kane/testmd/          <- base TestMD template
+  │   ├── hyperexecute/         <- base HE config template
+  │   └── workflows/            <- GHA workflow template placeholder
+  ├── requirements.txt
+  ├── pytest.ini
+  ├── agentic-stlc.config.yaml
+  └── tests/playwright/conftest.py
 
-GitHub Actions then runs .agentic/ci/analyze_requirements.py (Stage 1 / Kane AI)
-and .agentic/ci/agent.py (Stages 2-7 / Orchestrator) — all processing in CI.
+.AGENTIC/ FOLDER (injected into the target repo):
+  .agentic/ci/                  <- All 25 pipeline Python scripts
+  .agentic/requirements.txt     <- Python deps (mcp, httpx, playwright, pytest...)
+  .agentic/pytest.ini
+  .agentic/hyperexecute.yaml    <- Adapted for target app URL
+  .agentic/agentic-stlc.config.yaml <- Adapted for target repo
+  .agentic/requirements/search.txt  <- The business requirement (input to pipeline)
+  .agentic/scenarios/scenarios.json <- Empty; populated by pipeline Stage 2
+  .agentic/tests/playwright/conftest.py <- LambdaTest Playwright fixture
+
+GitHub Actions runs .agentic/ci/analyze_requirements.py (Stage 1 / Kane AI)
+and .agentic/ci/agent.py (Stages 2-7 / Orchestrator) -all processing in CI.
+Execution mirrors: lambdapro/agentic-stlc-kane-hyperexecute (3-job pipeline).
 
 Modes:
   --mode analyze  : Read-only repo analysis, prints RepoProfile (no branch created)
-  --mode inject   : Clone + inject pipeline into .agentic/ + push (no GHA trigger)
-  --mode run      : Full pipeline — inject + trigger + watch + collect (default)
+  --mode inject   : Bootstrap workspace + clone + inject pipeline + push (no GHA trigger)
+  --mode run      : Full pipeline -bootstrap + inject + trigger + watch + collect (default)
 
 Usage:
     python ci/repo_upgrade_orchestrator.py \\
@@ -82,7 +98,22 @@ _PIPELINE_CI_FILES = [
     "ci/rca_parser.py",
 ]
 
-# Files copied from repo root -> .agentic/
+# Repo-upgrade skill scripts -local workspace only (not needed in .agentic/ci/)
+_SKILL_CI_FILES = [
+    "ci/repo_analyzer.py",
+    "ci/testmd_generator.py",
+    "ci/test_analyzer.py",
+    "ci/test_injector.py",
+    "ci/hyperexecute_builder.py",
+    "ci/gha_injector.py",
+    "ci/repo_upgrade_orchestrator.py",
+    "ci/conversational_orchestrator.py",
+]
+
+# All CI scripts for the local workspace (pipeline + skill scripts)
+_ALL_WORKSPACE_CI_FILES = _PIPELINE_CI_FILES + _SKILL_CI_FILES
+
+# Files copied from repo root -> .agentic/  (and also to workspace root)
 _PIPELINE_ROOT_FILES = [
     ("requirements.txt",                 "requirements.txt"),
     ("pytest.ini",                       "pytest.ini"),
@@ -108,6 +139,246 @@ def _slug(text: str) -> str:
     s = re.sub(r"[^\w\s-]", "", text.lower())
     s = re.sub(r"[\s_-]+", "-", s)
     return s[:50].strip("-")
+
+
+# ---------------------------------------------------------------------------
+# Stage A: Bootstrap the local orchestration workspace
+# ---------------------------------------------------------------------------
+
+def bootstrap_local_workspace(
+    workspace_root: Path,
+    profile: repo_analyzer.RepoProfile,
+    config: dict,
+) -> None:
+    """
+    Create the self-contained local orchestration runtime at workspace_root/.
+
+    After this call the workspace contains everything needed to run the
+    orchestrator locally AND serves as the source for .agentic/ injection:
+
+      workspace_root/
+      ├── ci/                    <- ALL pipeline + skill scripts (local copy)
+      ├── templates/
+      │   ├── kane/testmd/       <- base TestMD template
+      │   ├── hyperexecute/      <- base HE config template
+      │   └── workflows/         <- placeholder (workflow generated at inject time)
+      ├── requirements.txt
+      ├── pytest.ini
+      ├── agentic-stlc.config.yaml
+      └── tests/playwright/conftest.py
+
+    The cloned target repo is placed as a sibling: workspace_root/{repo_name}/
+    """
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    print(f"\n[Stage A] Bootstrapping local workspace -> {workspace_root}")
+
+    total = 0
+
+    # 1. Copy ALL CI scripts (pipeline + skill scripts)
+    ci_dest = workspace_root / "ci"
+    ci_dest.mkdir(parents=True, exist_ok=True)
+    for rel_path in _ALL_WORKSPACE_CI_FILES:
+        src = _REPO_ROOT / rel_path
+        if not src.exists():
+            print(f"  [warn] source not found: {rel_path}")
+            continue
+        dest = ci_dest / src.name
+        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        total += 1
+    print(f"  ci/        {total} scripts (pipeline + skill)")
+
+    # 2. Copy support files (requirements.txt, pytest.ini, conftest.py)
+    support = 0
+    for src_rel, dest_rel in _PIPELINE_ROOT_FILES:
+        src = _REPO_ROOT / src_rel
+        if not src.exists():
+            print(f"  [warn] source not found: {src_rel}")
+            continue
+        dest = workspace_root / dest_rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        support += 1
+    print(f"  support    {support} files (requirements.txt, pytest.ini, conftest.py)")
+
+    # 3. Copy template files
+    _write_workspace_templates(workspace_root, profile)
+
+    # 4. Write workspace-level adapted config
+    kane_cfg = config.get("kaneai", {})
+    project_id = os.getenv("KANE_PROJECT_ID", "") or kane_cfg.get("project_id", "")
+    folder_id = os.getenv("KANE_FOLDER_ID", "") or kane_cfg.get("folder_id", "")
+    target_url = profile.target_url or profile.app_url_local or ""
+    ws_config = _build_workspace_config(profile, project_id, folder_id, target_url)
+    (workspace_root / "agentic-stlc.config.yaml").write_text(ws_config, encoding="utf-8")
+
+    # 5. Initialize empty state dirs (mirroring .agentic/ structure for local runs)
+    for rel in ["requirements", "scenarios", "reports", "kane", "tests/playwright"]:
+        (workspace_root / rel).mkdir(parents=True, exist_ok=True)
+
+    print(f"\n  Workspace ready: {workspace_root.resolve()}")
+    print(f"    {workspace_root.name}/")
+    print(f"    +-- ci/                      ({total} scripts)")
+    print(f"    +-- templates/kane/testmd/   (base TestMD template)")
+    print(f"    +-- templates/hyperexecute/  (base HE config)")
+    print(f"    +-- requirements.txt + pytest.ini")
+    print(f"    +-- agentic-stlc.config.yaml (adapted for {profile.name})")
+
+
+def _write_workspace_templates(workspace_root: Path, profile: repo_analyzer.RepoProfile) -> None:
+    """Write template files into workspace_root/templates/."""
+    target_url = profile.target_url or profile.app_url_local or "http://localhost:3000"
+
+    # Base Kane TestMD template
+    testmd_dir = workspace_root / "templates" / "kane" / "testmd"
+    testmd_dir.mkdir(parents=True, exist_ok=True)
+    base_testmd = f"""\
+---
+mode: testing
+headless: true
+max_steps: 30
+timeout: 120
+code_export: true
+code_language: typescript
+variables:
+  app_url:
+    value: "{target_url}"
+---
+
+# Requirement Verification
+
+## Open Application
+Open {{{{app_url}}}} and wait for the full page to load. Confirm the main navigation is visible.
+
+## Verify Feature
+Describe the feature verification steps in plain English. Be specific about what element
+to locate and what text, state, or condition to assert.
+If the expected element is not visible after page load, fail this step and describe
+what is currently shown.
+"""
+    (testmd_dir / "base_test.md").write_text(base_testmd, encoding="utf-8")
+
+    # Also write a helper template
+    helper_dir = workspace_root / "templates" / "kane" / "helpers"
+    helper_dir.mkdir(parents=True, exist_ok=True)
+    (helper_dir / "navigate_home.md").write_text(
+        f"Open {{{{app_url}}}} and wait for the navigation header to be visible.\n",
+        encoding="utf-8",
+    )
+
+    # Base HyperExecute config template (copy from orchestration repo)
+    he_src = _REPO_ROOT / "hyperexecute.yaml"
+    he_template_dir = workspace_root / "templates" / "hyperexecute"
+    he_template_dir.mkdir(parents=True, exist_ok=True)
+    if he_src.exists():
+        (he_template_dir / "hyperexecute.yaml").write_text(
+            he_src.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+
+    # Workflows placeholder -actual content generated by gha_injector at inject time
+    workflows_dir = workspace_root / "templates" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    (workflows_dir / ".gitkeep").write_text("", encoding="utf-8")
+
+    print(f"  templates/ kane/testmd, hyperexecute, workflows")
+
+
+def _build_workspace_config(
+    profile: repo_analyzer.RepoProfile,
+    project_id: str,
+    folder_id: str,
+    target_url: str,
+) -> str:
+    return f"""\
+# Agentic STLC Platform -Workspace Configuration
+# Auto-generated by Agentic STLC repo-upgrade skill
+# Target repository: {profile.repo_url}
+
+version: "1.0"
+
+project:
+  name: "{profile.name.lower()}-stlc"
+  description: "Agentic STLC pipeline for {profile.name}"
+  repository: "{profile.repo_url}"
+  branch: "{profile.default_branch}"
+
+requirements:
+  format: "acceptance_criteria"
+  paths:
+    - "requirements/search.txt"
+  output_path: "requirements/analyzed_requirements.json"
+  encoding: "utf-8"
+
+scenarios:
+  path: "scenarios/scenarios.json"
+  id_prefix: "SC"
+  id_start: 1
+
+framework:
+  type: "playwright"
+  language: "python"
+  test_dir: "tests/playwright"
+  test_file: "tests/playwright/test_powerapps.py"
+
+target:
+  url: "{target_url}"
+  environment: "staging"
+
+execution:
+  provider: "hyperexecute"
+  mode: "incremental"
+  concurrency: 5
+  timeout_seconds: 90
+  retries: 1
+  browsers:
+    - chrome
+  platforms:
+    - windows10
+
+hyperexecute:
+  config_file: "hyperexecute.yaml"
+  cli_path: "./hyperexecute"
+  project: "{profile.name.lower()}-stlc"
+  region: "us"
+
+kaneai:
+  enabled: true
+  parallel_workers: 10
+  timeout_seconds: 120
+  project_id: "{project_id}"
+  folder_id: "{folder_id}"
+  use_testmd: true
+  testmd_output_dir: "kane/testmd"
+
+reporting:
+  output_dir: "reports"
+  formats:
+    - json
+    - markdown
+  github_summary: true
+  artifacts:
+    - "reports/"
+    - "scenarios/scenarios.json"
+    - "tests/playwright/test_powerapps.py"
+
+quality_gates:
+  min_coverage_pct: 50
+  min_pass_rate: 75
+  max_flaky: 5
+  require_critical_coverage: true
+  max_high_risk_uncovered: 999
+  min_he_pct: 0
+  confidence:
+    enabled: true
+    gate_severity: "WARNING"
+
+repo_upgrade:
+  workspace_dir: "agentic-stlc"
+  branch_prefix: "feature/agentic-"
+  he_config_name: "hyperexecute-agentic.yaml"
+  gha_workflow_name: "agentic-stlc.yml"
+  default_node_version: "18"
+  wait_on_timeout_ms: 60000
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +428,7 @@ def commit_and_push(workspace_path: str, branch: str, message: str) -> str:
     _run(["git", "add", "."], cwd=workspace_path)
     status = _run_capture(["git", "status", "--porcelain"], cwd=workspace_path)
     if not status:
-        print("[orchestrator] nothing to commit — files already up to date")
+        print("[orchestrator] nothing to commit -files already up to date")
         return _run_capture(["git", "rev-parse", "HEAD"], cwd=workspace_path)
     _run(["git", "commit", "-m", message], cwd=workspace_path)
     _run(["git", "push", "origin", branch, "--force-with-lease"], cwd=workspace_path)
@@ -250,7 +521,7 @@ def bootstrap_agentic_dir(
     _init_state_files(dest_agentic)
 
     total = len(_PIPELINE_CI_FILES) + len(_PIPELINE_ROOT_FILES) + 5
-    print(f"[Stage C] done — {total} files written to .agentic/")
+    print(f"[Stage C] done -{total} files written to .agentic/")
     return dest_agentic
 
 
@@ -262,7 +533,7 @@ def _copy_ci_scripts(dest_agentic: Path) -> None:
         if not src.exists():
             print(f"  [warn] source not found: {rel_path}")
             continue
-        # rel_path is "ci/foo.py" — dest_name is "foo.py"
+        # rel_path is "ci/foo.py" -dest_name is "foo.py"
         dest = ci_dest / src.name
         dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     print(f"  copied {len(_PIPELINE_CI_FILES)} CI scripts -> .agentic/ci/")
@@ -317,7 +588,7 @@ def _write_agentic_config(
     folder_id = kane_cfg.get("folder_id", "")
 
     content = f"""\
-# Agentic STLC Platform — Project Configuration
+# Agentic STLC Platform -Project Configuration
 # Auto-generated by Agentic STLC repo-upgrade skill
 # Repository: {profile.repo_url}
 
@@ -407,7 +678,7 @@ def _write_requirements_file(dest_agentic: Path, requirement: str, profile: repo
     req_dir = dest_agentic / "requirements"
     req_dir.mkdir(parents=True, exist_ok=True)
     content = f"""\
-Title: {profile.name} — Agentic STLC Requirements
+Title: {profile.name} -Agentic STLC Requirements
 # Auto-generated by Agentic STLC repo-upgrade skill
 
 As a user
@@ -422,7 +693,7 @@ Acceptance Criteria:
 
 
 def _init_state_files(dest_agentic: Path) -> None:
-    """Initialize empty state files — pipeline populates them during CI runs."""
+    """Initialize empty state files -pipeline populates them during CI runs."""
     init = {
         "scenarios/scenarios.json": "[]",
         "requirements/analyzed_requirements.json": "[]",
@@ -447,15 +718,31 @@ def cmd_analyze(args: argparse.Namespace) -> None:
     for k, v in profile.__dict__.items():
         print(f"  {k}: {v!r}")
 
+    config = _load_config()
+    workspace_dir = config.get("repo_upgrade", {}).get("workspace_dir", "agentic-stlc")
+
     if args.requirement:
-        print(f"\n=== .agentic/ structure to be injected ===")
-        print(f"  .agentic/ci/                    <- {len(_PIPELINE_CI_FILES)} pipeline scripts")
-        print(f"  .agentic/requirements/search.txt <- requirement input")
-        print(f"  .agentic/hyperexecute.yaml       <- adapted for {profile.name}")
-        print(f"  .agentic/agentic-stlc.config.yaml")
-        print(f"  .agentic/requirements.txt + pytest.ini + tests/playwright/conftest.py")
-        print(f"\n=== GHA Pipeline Flow ===")
-        print(f"  Job 1 (analyze)     <- KaneAI verifies requirement against {profile.target_url or profile.app_url_local}")
+        req_slug = _slug(args.requirement)
+        branch = args.branch if args.branch else f"feature/agentic-{req_slug}"
+        print(f"\n=== Workspace to be created: {workspace_dir}/ ===")
+        print(f"  {workspace_dir}/")
+        print(f"  +-- {profile.name}/                  <- target repo (cloned)")
+        print(f"  |   +-- .agentic/                    <- complete Agentic STLC pipeline")
+        print(f"  |   |   +-- ci/                      <- {len(_PIPELINE_CI_FILES)} pipeline scripts")
+        print(f"  |   |   +-- requirements/search.txt  <- requirement input")
+        print(f"  |   |   +-- hyperexecute.yaml         <- adapted HE config")
+        print(f"  |   |   +-- agentic-stlc.config.yaml")
+        print(f"  |   +-- .github/workflows/agentic-stlc.yml  <- 3-job GHA workflow")
+        print(f"  +-- ci/                              <- {len(_ALL_WORKSPACE_CI_FILES)} scripts (local copy)")
+        print(f"  +-- templates/kane/testmd/           <- base TestMD template")
+        print(f"  +-- templates/hyperexecute/          <- base HE config template")
+        print(f"  +-- requirements.txt + pytest.ini")
+        print(f"  +-- agentic-stlc.config.yaml        <- adapted for {profile.name}")
+        print(f"\n=== GHA Pipeline Flow (mirrors lambdapro/agentic-stlc-kane-hyperexecute) ===")
+        print(f"  Branch:  {branch}")
+        target = profile.target_url or profile.app_url_local or "http://localhost:3000"
+        print(f"  Target:  {target}")
+        print(f"  Job 1 (analyze)     <- KaneAI verifies requirement against {target}")
         print(f"  Job 2 (orchestrate) <- Scenario sync, test gen, HyperExecute, traceability")
         print(f"  Job 3 (summary)     <- Verdict: GREEN / YELLOW / RED")
 
@@ -465,15 +752,38 @@ def cmd_analyze(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 def cmd_inject(args: argparse.Namespace, config: dict) -> str:
-    """Clone repo, bootstrap .agentic/, inject workflow, push. Returns workspace path."""
-    workspace_dir = config.get("repo_upgrade", {}).get("workspace_dir", "workspace")
+    """
+    Bootstrap workspace, clone repo, inject Agentic STLC pipeline, push.
+    Returns the path to the cloned target repo inside the workspace.
+
+    Stages:
+      A - Bootstrap local orchestration workspace (agentic-stlc/)
+      B - Clone target repo into workspace
+      C - Bootstrap .agentic/ inside target repo with complete pipeline
+      D - Inject GHA workflow (.github/workflows/agentic-stlc.yml)
+      E - Commit and push feature branch
+    """
+    workspace_dir = config.get("repo_upgrade", {}).get("workspace_dir", "agentic-stlc")
+    target_url = getattr(args, "target_url", "")
+
+    # Analyze repo first (read-only, no clone) so profile informs the workspace
+    print("\n[Stage A-pre] Analyzing target repo (read-only)...")
+    profile = repo_analyzer.analyze(args.repo_url, target_url)
+    print(f"  {profile.owner}/{profile.name}  framework={profile.framework}  "
+          f"pkg={profile.package_manager}  port={profile.app_port}  "
+          f"kane_mode={profile.kane_mode}")
+
+    # Stage A: Bootstrap local workspace
+    workspace_root = Path(workspace_dir)
+    bootstrap_local_workspace(workspace_root, profile, config)
+
+    # Stage B: Clone target repo into workspace
+    print(f"\n[Stage B] Cloning {profile.owner}/{profile.name} -> {workspace_dir}/{profile.name}/")
     workspace_path = clone_repo(args.repo_url, workspace_dir)
 
     branch = args.branch or f"feature/agentic-{_slug(args.requirement)}"
     create_branch(workspace_path, branch)
-    print(f"[orchestrator] on branch {branch}")
-
-    profile = repo_analyzer.analyze(args.repo_url, getattr(args, "target_url", ""))
+    print(f"  Branch: {branch}")
 
     # Stage C: Bootstrap .agentic/ with complete pipeline
     bootstrap_agentic_dir(workspace_path, profile, args.requirement, config)
@@ -483,31 +793,42 @@ def cmd_inject(args: argparse.Namespace, config: dict) -> str:
     kane_cfg = config.get("kaneai", {})
     project_id = os.getenv("KANE_PROJECT_ID", "") or kane_cfg.get("project_id", "")
     folder_id = os.getenv("KANE_FOLDER_ID", "") or kane_cfg.get("folder_id", "")
-    gha_injector.inject(
+    workflow_rel = gha_injector.inject(
         repo_profile=profile,
         workspace_dir=workspace_path,
         kane_project_id=project_id,
         kane_folder_id=folder_id,
     )
+    print(f"  {workflow_rel}")
+
+    # Copy the generated workflow into workspace templates for reference
+    wf_src = Path(workspace_path) / ".github" / "workflows" / "agentic-stlc.yml"
+    wf_tmpl = workspace_root / "templates" / "workflows" / "agentic-stlc.yml"
+    if wf_src.exists():
+        wf_tmpl.write_text(wf_src.read_text(encoding="utf-8"), encoding="utf-8")
 
     # Stage E: Commit and push
     print("\n[Stage E] Committing and pushing...")
     req_slug = _slug(args.requirement)
-    commit_and_push(
+    sha = commit_and_push(
         workspace_path, branch,
         f"feat: inject agentic STLC pipeline for [{req_slug}]\n\n"
         f"Requirement: {args.requirement}\n\n"
-        f"Injects the complete Agentic STLC pipeline into .agentic/ — the\n"
-        f"target repo's source tree is untouched. GitHub Actions runs all\n"
-        f"stages (KaneAI verification, HyperExecute, traceability, verdict)\n"
-        f"from .agentic/ci/ autonomously.\n\n"
+        f"Bootstraps the complete Agentic STLC pipeline into .agentic/ inside\n"
+        f"the target repo. The project's own source tree is untouched. GitHub\n"
+        f"Actions runs all stages (KaneAI verification, HyperExecute regression,\n"
+        f"traceability, verdict) from .agentic/ci/ autonomously.\n\n"
+        f"Pipeline mirrors: lambdapro/agentic-stlc-kane-hyperexecute (3-job)\n\n"
         f"Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>",
     )
 
-    print(f"\n[orchestrator] inject complete")
-    print(f"  Branch:   {branch}")
-    print(f"  Pipeline: .agentic/ ({len(_PIPELINE_CI_FILES)} CI scripts + workflow)")
-    print(f"  Trigger:  push to {branch} will start agentic-stlc.yml automatically")
+    print(f"\n[inject complete]")
+    print(f"  Workspace:  {workspace_root.resolve()}/")
+    print(f"  Target repo: {workspace_path}")
+    print(f"  Branch:     {branch} -> {sha[:8] if sha else 'n/a'}")
+    print(f"  Pipeline:   .agentic/ ({len(_PIPELINE_CI_FILES)} CI scripts + config)")
+    print(f"  Workflow:   .github/workflows/agentic-stlc.yml")
+    print(f"  Auto-trigger: push to {branch} starts agentic-stlc.yml")
     return workspace_path
 
 
@@ -518,7 +839,7 @@ def cmd_inject(args: argparse.Namespace, config: dict) -> str:
 def cmd_run(args: argparse.Namespace, config: dict) -> None:
     workspace_path = cmd_inject(args, config)
 
-    profile = repo_analyzer.analyze(args.repo_url)
+    profile = repo_analyzer.analyze(args.repo_url, getattr(args, "target_url", ""))
     branch = args.branch or f"feature/agentic-{_slug(args.requirement)}"
     workflow = "agentic-stlc.yml"
 
@@ -526,7 +847,7 @@ def cmd_run(args: argparse.Namespace, config: dict) -> None:
     print(f"\n[Stage F] Triggering {workflow} on {profile.owner}/{profile.name}@{branch}...")
     run_id = trigger_workflow(profile.owner, profile.name, branch, workflow)
     if not run_id:
-        print("[orchestrator] warning: could not retrieve run ID — check GHA manually")
+        print("[orchestrator] warning: could not retrieve run ID -check GHA manually")
         print(f"  https://github.com/{profile.owner}/{profile.name}/actions")
         return
 
@@ -541,13 +862,16 @@ def cmd_run(args: argparse.Namespace, config: dict) -> None:
     print("\n[Stage G] Watching pipeline...")
     exit_code = watch_run(profile.owner, profile.name, run_id)
 
-    # Stage H: Download artifacts
-    artifacts_dir = str(Path(workspace_path) / "reports" / "gha_artifacts")
-    print(f"\n[Stage H] Downloading artifacts to {artifacts_dir}...")
+    # Stage H: Download artifacts into workspace reports dir
+    workspace_dir = config.get("repo_upgrade", {}).get("workspace_dir", "agentic-stlc")
+    artifacts_dir = str(Path(workspace_dir) / "reports" / "gha_artifacts")
+    print(f"\n[Stage H] Downloading artifacts -> {artifacts_dir}/")
     download_artifacts(profile.owner, profile.name, run_id, artifacts_dir)
 
     # Display verdict from pipeline-reports artifact
-    rec_json = Path(artifacts_dir) / "pipeline-reports" / "release_recommendation.json"
+    rec_json = Path(artifacts_dir) / "pipeline-reports" / "reports" / "release_recommendation.json"
+    if not rec_json.exists():
+        rec_json = Path(artifacts_dir) / "pipeline-reports" / "release_recommendation.json"
     if rec_json.exists():
         result = json.loads(rec_json.read_text())
         print("\n=== Release Verdict ===")
@@ -558,14 +882,16 @@ def cmd_run(args: argparse.Namespace, config: dict) -> None:
             for req in result["failing_requirements"][:5]:
                 print(f"    - {req}")
 
-    matrix_md = Path(artifacts_dir) / "pipeline-reports" / "traceability_matrix.md"
+    matrix_md = Path(artifacts_dir) / "pipeline-reports" / "reports" / "traceability_matrix.md"
+    if not matrix_md.exists():
+        matrix_md = Path(artifacts_dir) / "pipeline-reports" / "traceability_matrix.md"
     if matrix_md.exists():
         lines = matrix_md.read_text().splitlines()[:15]
         print("\n=== Traceability Matrix (excerpt) ===")
         for line in lines:
             print(f"  {line}")
 
-    print(f"\n[orchestrator] pipeline complete — exit_code={exit_code}")
+    print(f"\n[orchestrator] pipeline complete -exit_code={exit_code}")
     print(f"  GHA run: {monitor_url}")
     sys.exit(exit_code)
 

@@ -86,7 +86,7 @@ quality_gates:
 # ── Repo Upgrade Skill Configuration ─────────────────────────────────────────
 # Settings for the "repo-upgrade" skill that upgrades any GitHub repo.
 repo_upgrade:
-  workspace_dir: "workspace"           # local directory for cloned target repos
+  workspace_dir: "agentic-stlc"       # isolated workspace: scripts + templates + cloned repos
   branch_prefix: "feature/agentic-"   # prefix for generated feature branches
   he_config_name: "hyperexecute-agentic.yaml"
   gha_workflow_name: "agentic-validate.yml"

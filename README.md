@@ -187,6 +187,34 @@ Claude ◀──────────────────── reads ONE
 
 ---
 
+## One-Line Test Prompt
+
+Copy this into any Claude Code conversation to trigger the full Agentic STLC pipeline against any GitHub repo:
+
+```
+Run agentic STLC on https://github.com/<owner>/<repo> for: <your plain-English requirement>
+```
+
+**Live example (contosotraders demo):**
+
+```
+Run agentic STLC on https://github.com/lambdapro/contosotraders-cloudtesting-copilot-HEx for: The application top banner should display a Memorial Day Sale banner.
+```
+
+What happens after you type this and confirm:
+1. Workspace bootstrapped at `agentic-stlc/` — 33 pipeline scripts + templates
+2. Target repo cloned → feature branch created
+3. 10 TestMD files generated + `.agentic/` pipeline injected (25 CI scripts + config)
+4. GHA workflow injected — 3-job pipeline (KaneAI → HyperExecute → verdict)
+5. Branch pushed — pipeline triggers automatically
+6. Kane CLI runs 10 TestMD tests in parallel against `http://localhost:3000`
+7. HyperExecute runs Playwright regression across the browser matrix
+8. GREEN / YELLOW / RED verdict + RCA streamed to chat
+
+**Requires:** `LT_USERNAME` and `LT_ACCESS_KEY` set as GitHub Secrets in the target repo.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -609,6 +637,174 @@ Replace the `trigger_workflow()` function in `ci/conversational_orchestrator.py`
 1. POST the event from GitHub Actions using the `notify` composite action
 2. Add a row to `_STAGE_LABELS` and `_format_event()` in `conversational_orchestrator.py`
 3. Add the event description to `SKILL.md` Step 7's event table
+
+---
+
+## Autonomous Repo Onboarding — Repo Upgrade Skill
+
+> Give the skill any GitHub repo URL and a plain-English requirement. It bootstraps a self-contained workspace, injects the complete Agentic STLC pipeline into the target repo, pushes a feature branch, triggers GitHub Actions, streams results, and returns a full RCA — zero manual steps.
+
+### How It Works
+
+```
+Chat input: repo URL + requirement
+       ↓
+[Stage A] Bootstrap local workspace (agentic-stlc/)
+          All pipeline + skill scripts, templates, config — self-contained
+       ↓
+[Stage B] Clone target repo → agentic-stlc/{repo}/
+          Create feature branch: feature/agentic-<slug>
+       ↓
+[Stage C] Inject .agentic/ into target repo
+          25 pipeline CI scripts, adapted config, HE config, requirement input
+       ↓
+[Stage D] Inject .github/workflows/agentic-stlc.yml
+          3-job workflow mirrors lambdapro/agentic-stlc-kane-hyperexecute
+       ↓
+[Stage E] Commit + push feature branch
+       ↓
+[Stage F] Trigger GitHub Actions → print monitor URL
+       ↓
+[Stage G] Watch pipeline (analyze → orchestrate → summary)
+          Job 1: KaneAI verifies acceptance criteria (10 parallel workers)
+          Job 2: Scenario sync, Playwright gen, HyperExecute, traceability
+          Job 3: GREEN / YELLOW / RED verdict
+       ↓
+[Stage H] Download artifacts → agentic-stlc/reports/gha_artifacts/
+       ↓
+Chat output: Kane verdict + Playwright results + RCA + fix suggestions
+```
+
+### Workspace Structure
+
+Every run creates an isolated, self-contained workspace at `agentic-stlc/`:
+
+```
+agentic-stlc/                          ← orchestration runtime (gitignored)
+├── {target-repo}/                     ← cloned target repo
+│   ├── .agentic/                      ← complete Agentic STLC pipeline
+│   │   ├── ci/                        ← 25 pipeline scripts
+│   │   ├── requirements/search.txt    ← injected requirement
+│   │   ├── hyperexecute.yaml          ← adapted for target app URL
+│   │   ├── agentic-stlc.config.yaml  ← adapted for target repo
+│   │   ├── requirements.txt + pytest.ini
+│   │   ├── tests/playwright/conftest.py
+│   │   └── scenarios/, reports/, kane/  (empty; populated by GHA)
+│   └── .github/workflows/
+│       └── agentic-stlc.yml           ← injected 3-job workflow
+├── ci/                                ← ALL scripts (pipeline + skill) for local runs
+├── templates/
+│   ├── kane/testmd/base_test.md       ← base TestMD template ({{app_url}} variable)
+│   ├── kane/helpers/navigate_home.md  ← reusable navigation helper
+│   ├── hyperexecute/hyperexecute.yaml ← base HE config template
+│   └── workflows/agentic-stlc.yml    ← copy of injected workflow
+├── requirements.txt + pytest.ini
+├── agentic-stlc.config.yaml          ← adapted for target repo
+├── tests/playwright/conftest.py
+└── reports/gha_artifacts/            ← GHA artifacts after pipeline completes
+```
+
+The workspace is **portable** — zip it and run it from any machine with Python 3.11+, Node.js, and LambdaTest credentials.
+
+### Pipeline Parity
+
+The injected 3-job workflow replicates the execution model of `lambdapro/agentic-stlc-kane-hyperexecute`:
+
+| GHA Job | Stage | What runs |
+|---------|-------|-----------|
+| `analyze` | Stage 1 | `.agentic/ci/analyze_requirements.py` — KaneAI (10 parallel, TestMD mode) |
+| `orchestrate` | Stages 2–7 | `.agentic/ci/agent.py` — scenario sync → Playwright gen → HyperExecute → traceability → verdict |
+| `summary` | Summary | Prints GREEN / YELLOW / RED to GitHub Step Summary (`if: always()`) |
+
+Artifact flow: `analyze` uploads `analyzed-requirements` → `orchestrate` downloads it → both upload `pipeline-reports`.
+
+### Quick Start
+
+```bash
+# Trigger from Claude Code chat:
+# "Run agentic STLC on https://github.com/owner/repo for: <requirement>"
+
+# Or from terminal:
+python ci/repo_upgrade_orchestrator.py \
+  --mode run \
+  --repo-url https://github.com/lambdapro/contosotraders-cloudtesting-copilot-HEx \
+  --requirement "The application top banner should display a Memorial Day Sale banner." \
+  --target-url https://contoso-traders.lambdatest.io
+
+# Analyze only (read-only, no clone):
+python ci/repo_upgrade_orchestrator.py \
+  --mode analyze \
+  --repo-url https://github.com/owner/repo \
+  --requirement "Your requirement here"
+
+# Inject only (no GHA trigger):
+python ci/repo_upgrade_orchestrator.py \
+  --mode inject \
+  --repo-url https://github.com/owner/repo \
+  --requirement "Your requirement here"
+```
+
+### Required Secrets in Target Repo
+
+Add these to **Settings → Secrets → Actions** in the target repo before triggering:
+
+| Secret | Purpose |
+|--------|---------|
+| `LT_USERNAME` | LambdaTest username (Kane CLI + HyperExecute) |
+| `LT_ACCESS_KEY` | LambdaTest access key |
+
+### Example Chat Interaction
+
+```
+User: Run agentic STLC on https://github.com/lambdapro/contosotraders-cloudtesting-copilot-HEx
+      for: The application top banner should display a Memorial Day Sale banner.
+
+Claude:
+  Repo:         lambdapro/contosotraders-cloudtesting-copilot-HEx
+  Requirement:  "The application top banner should display a Memorial Day Sale banner."
+  Branch:       feature/agentic-the-application-top-banner-should-display
+  Mode:         run (bootstrap workspace → inject → trigger GHA → stream results → RCA)
+
+  Local workspace: agentic-stlc/
+    ├── contosotraders-cloudtesting-copilot-HEx/  (cloned, .agentic/ injected)
+    ├── ci/                                        (25 pipeline + skill scripts)
+    └── templates/                                 (Kane TestMD, HE config, workflow)
+
+  TMS: project=01J2VAWPNBPA21T0BW44JW026X  folder=01KPD0NC5ZXZD9EXB23QCATTG2
+
+  Proceed? [yes / no / change branch]
+
+User: yes
+
+Claude:
+  [Stage A] Workspace bootstrapped: agentic-stlc/ (33 scripts + templates)
+  [Stage B] Cloned contosotraders-... → agentic-stlc/contosotraders-.../
+  [Stage C] .agentic/ bootstrapped (25 CI scripts + config + state)
+  [Stage D] GHA workflow injected → .github/workflows/agentic-stlc.yml
+  [Stage E] Pushed feature/agentic-... → a7f3c91
+
+  Pipeline triggered on branch feature/agentic-...
+  Monitor: https://github.com/lambdapro/contosotraders-.../actions/runs/12345678
+
+  Waiting for 3-job pipeline:
+    Job 1: KaneAI Verification  (~5 min)
+    Job 2: HyperExecute Regression  (~10 min)
+    Job 3: Summary
+
+  [1/3] KaneAI Verification — running...
+  [2/3] Orchestrator — running (scenario sync → Playwright gen → HyperExecute)...
+  [3/3] Summary — complete
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    FEATURE VALIDATION: RED ❌
+    Kane:       0/1 passed  (banner not found)
+    Playwright: 0/2 passed  (AssertionError — element not in DOM)
+    HE Job:     https://hyperexecute.lambdatest.com/...
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  RCA: APPLICATION_DEFECT — headerMessage.js exists but is not imported in header.js.
+  Fix: import './headerMessage' in header.js and render <HeaderMessage /> above <Categories />.
+```
 
 ---
 
