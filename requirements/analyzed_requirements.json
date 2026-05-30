@@ -1,6 +1,48 @@
 [
   {
     "id": "AC-001",
+    "title": "Homepage shows main header or banner",
+    "description": "The homepage loads and displays the main header or promotional banner.",
+    "kane_one_liner": "Homepage displays promotional banner",
+    "kane_summary": "Verify homepage banner is visible",
+    "status": "new"
+  },
+  {
+    "id": "AC-002",
+    "title": "Catalog lists products",
+    "description": "The product catalog page lists at least 10 products and shows product names and prices.",
+    "kane_one_liner": "Catalog page lists products with names and prices",
+    "kane_summary": "Verify product list and prices are visible",
+    "status": "new"
+  },
+  {
+    "id": "AC-003",
+    "title": "Product detail shows name and Add to Cart",
+    "description": "A product detail page shows product name, price, and an Add to Cart button.",
+    "kane_one_liner": "Product detail shows name, price, and Add to Cart",
+    "kane_summary": "Verify product detail elements are visible",
+    "status": "new"
+  },
+  {
+    "id": "AC-004",
+    "title": "Add product to cart updates cart",
+    "description": "Adding a product to the cart increases the cart item count and displays the item in the cart.",
+    "kane_one_liner": "Add product to cart updates cart indicator",
+    "kane_summary": "Verify cart count and cart contents after add",
+    "status": "new"
+  },
+  {
+    "id": "AC-005",
+    "title": "Cart allows update and remove",
+    "description": "The cart page allows updating quantity and removing items; totals update accordingly.",
+    "kane_one_liner": "Cart update and remove work and recalc totals",
+    "kane_summary": "Verify cart update/remove behavior",
+    "status": "new"
+  }
+]
+[
+  {
+    "id": "AC-001",
     "description": "User can add a product to the cart from the product detail page and see the cart item count update",
     "feature": "",
     "user_story": "As a shopper",
@@ -178,5 +220,23 @@
     "kane_one_liner": "",
     "kane_steps": [],
     "kane_duration_ms": 0
+  },
+  {
+    "id": "AC-016",
+    "title": "Top banner displays Memorial Day Sale",
+    "description": "The application top banner should display a Memorial Day Sale banner",
+    "url": "http://localhost:3000",
+    "kane_status": "timeout",
+    "kane_one_liner": "Kane verification timed out \u2014 localhost:3000 via LT tunnel",
+    "kane_summary": "Kane subprocess exceeded 120s limit. Tunnel contoso-stlc-skill (ID 13620630) was established but the Kane agent did not complete navigation to localhost:3000 within the timeout window. The Playwright test result (below) is the authoritative verdict.",
+    "kane_steps": [],
+    "kane_final_state": {},
+    "kane_duration": 251.8,
+    "kane_links": [],
+    "kane_share_link": "",
+    "kane_testcase_link": "",
+    "kane_session_id": "",
+    "kane_code_export_dir": "",
+    "last_analyzed": "2026-05-29"
   }
 ]

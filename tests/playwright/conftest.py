@@ -180,6 +180,14 @@ def page(request):
             # via the browserName capability (pw-firefox, pw-webkit, Chrome, Edge…)
             browser = p.chromium.connect(ws_endpoint)
         context = browser.new_context()
+        # Increase default timeouts for remote/cloud runs so navigation and waits
+        # are resilient to network/tunnel latency. 90s aligns with HE timeouts.
+        try:
+            context.set_default_navigation_timeout(90000)
+            context.set_default_timeout(90000)
+        except Exception:
+            # Older Playwright versions may not expose these APIs on remote contexts.
+            pass
         pw_page = context.new_page()
 
         yield pw_page
@@ -248,6 +256,18 @@ def page(request):
             ),
             encoding="utf-8",
         )
+
+        # If this was a remote HyperExecute run and the test completed very
+        # quickly (e.g. <3s), wait briefly so HE can finalize session artifacts
+        # and the MCP analyzer can observe full session logs. This prevents
+        # races where sessions appear to stop in ~2s with no useful traces.
+        if not local_mode:
+            try:
+                if duration_ms < 3000:
+                    # small sleep to allow remote logging/video to be flushed
+                    time.sleep(4)
+            except Exception:
+                pass
 
         pw_page.close()
         context.close()

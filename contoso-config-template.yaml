@@ -1,0 +1,38 @@
+# Contoso configuration template for Agentic STLC
+# Copy this file to `agentic-stlc/contoso-config.yaml` and fill values.
+
+project:
+  name: "contoso-traders-stlc"
+  repository: "https://github.com/lambdapro/contosotraders-cloudtesting-copilot-HEx"
+
+target:
+  # Public or internal URL where Contoso app is reachable for tests
+  url: "https://your-contoso-app.example/"
+  environment: "staging"
+
+framework:
+  test_file: "tests/playwright/test_powerapps.py"
+
+execution:
+  provider: "hyperexecute"
+  concurrency: 5
+  timeout_seconds: 120
+  retries: 1
+
+kaneai:
+  enabled: true
+  parallel_workers: 5
+  timeout_seconds: 120
+  # Replace these with your Kane Test Management project/folder IDs
+  project_id: "<KANE_PROJECT_ID>"
+  folder_id: "<KANE_FOLDER_ID>"
+
+lambda_test:
+  # Set these as GitHub secrets in the target repository
+  username_secret: "LT_USERNAME"
+  access_key_secret: "LT_ACCESS_KEY"
+
+# Notes:
+# - Fill `kaneai.project_id` and `kaneai.folder_id` with values from your Kane/TMS.
+# - If Contoso app runs locally in CI, configure a tunnel and set HYPEREXECUTE_TUNNEL_NAME.
+# - Add Contoso acceptance criteria to `requirements/search.txt` before running Stage 1.

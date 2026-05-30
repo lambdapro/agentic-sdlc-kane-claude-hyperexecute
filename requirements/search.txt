@@ -1,5 +1,31 @@
-Title: Chat-Submitted Requirements — 2026-05-29
-# submitted via Agentic STLC Skill — contosotraders-cloudtesting-copilot-HEx
+﻿Title: LambdaTest Ecommerce Playground + Contoso Traders — Skill Run 2026-05-29
+# v3 — includes Memorial Day Sale banner requirement for contosotraders-cloudtesting-copilot-HEx
+
+As a shopper
+I want to browse and purchase products
+So that I can complete my goals
+
+Acceptance Criteria:
+- User can add a product to the cart from the product detail page and see the cart item count update
+- User can open the cart dropdown and see the list of added items with their names and prices
+- User can navigate to the Laptops product catalog and see a grid of product listings
+- User can apply a manufacturer brand filter from the sidebar to narrow product results
+- User can click a product thumbnail to open its detail page and see the product name and price
+- User can browse the homepage and product listings without logging in as a guest
+- User can search for a product by name using the search bar and see relevant results
+- User can register a new account by filling in first name last name email telephone and password fields
+- User can log in with a registered email address and password and land on the account dashboard
+- User can log out from the account and be redirected to the home page
+- User can remove an item from the shopping cart and see the cart update with the item gone
+- User can update the quantity of an item in the shopping cart and see the line total recalculate
+- User can sort products by price low to high and see the listing order change
+- User can add a product to the wish list from the product detail page and view it in the wishlist
+- User can complete a guest checkout by entering a shipping address and selecting flat rate shipping
+
+---
+
+Title: Contoso Traders — Chat-Submitted via Agentic STLC Skill
+# submitted 2026-05-29 — contosotraders-cloudtesting-copilot-HEx
 
 As a user
 I want to use the Contoso Traders application
@@ -7,3 +33,21 @@ So that I can complete my shopping goals
 
 Acceptance Criteria:
 The application top banner should display a Memorial Day Sale banner
+
+---
+
+Title: Contoso Traders — Quick Starter Smoke Tests
+# Added 2026-05-29
+
+As a tester
+I want a minimal set of smoke acceptance criteria
+So that I can validate Contoso's basic flows quickly
+
+Acceptance Criteria:
+- The homepage loads and shows a visible header or hero section.
+- The product catalog page returns at least one product and displays name and price.
+- A product detail page displays the product name and an Add to Cart control.
+- Adding a product to the cart updates the cart indicator and shows the item in the cart.
+
+Notes:
+- These quick ACs map to SC-017 and other generated scenarios; edit or expand as needed.

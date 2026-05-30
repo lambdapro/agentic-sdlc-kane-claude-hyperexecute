@@ -134,6 +134,29 @@ def _ec(path: str) -> str:
 
 
 PLAYWRIGHT_BODIES = {
+    # Contoso Traders — Memorial Day Sale banner
+    # HeaderMessage component in App.js renders: <div class="headerMessageDiv warning"><p class="message m-0">{msg}</p></div>
+    # Curly braces inside f-strings MUST be doubled so _build_test_function(...).format(url=url) does not crash.
+    "SC-016": (
+        '    page.goto("http://localhost:3000/")\n'
+        '    page.wait_for_load_state("networkidle", timeout=30000)\n'
+        '    banner = page.locator(".headerMessageDiv .message, .headerMessageDiv p, [class*=headerMessage] p").first\n'
+        '    banner.wait_for(timeout=20000)\n'
+        '    assert banner.count() > 0, "Top banner element (.headerMessageDiv .message) not found"\n'
+        '    banner_text = banner.inner_text().strip()\n'
+        '    assert "memorial day" in banner_text.lower() or "memorial sale" in banner_text.lower(), \\\n'
+        '        f"Top banner does not show Memorial Day Sale. Actual: {{banner_text!r}}"'
+    ),
+
+    # Contoso Traders sample check — homepage header/banner exists (uses TARGET_URL when generating)
+    "SC-017": (
+        '    page.goto("{url}")\n'
+        '    page.wait_for_load_state("domcontentloaded", timeout=30000)\n'
+        '    banner = page.locator(".app-header, .main-header, .banner, .hero").first\n'
+        '    banner.wait_for(timeout=15000)\n'
+        '    assert banner.count() > 0, "Main header/banner not found on homepage"'
+    ),
+
     # AC-001: Add a product to the cart from the product detail page and see cart count update
     "SC-001": (
         '    page.goto(' + _ec('/index.php?route=product/product&product_id=28') + ')\n'
@@ -791,7 +814,14 @@ def _write_api_details(job_inner: dict, he_tasks: list, job_id: str) -> None:
         "selenium_reports_link": job_inner.get("seleniumReportsLink", ""),
         "runtime_logs_link":     job_inner.get("runtimeLogsLink", ""),
     }
-    api_details = {"he_summary": he_summary, "he_tasks": he_tasks, "kane_sessions": []}
+    # he_job_id at root for simple downstream .get('he_job_id') lookups
+    resolved_job_id = he_summary.get("job_id", "") or job_id
+    api_details = {
+        "he_job_id": resolved_job_id,
+        "he_summary": he_summary,
+        "he_tasks": he_tasks,
+        "kane_sessions": [],
+    }
     Path("reports").mkdir(exist_ok=True)
     Path("reports/api_details.json").write_text(
         json.dumps(api_details, indent=2), encoding="utf-8"
