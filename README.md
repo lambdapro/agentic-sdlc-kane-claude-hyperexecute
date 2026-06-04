@@ -215,6 +215,142 @@ What happens after you type this and confirm:
 
 ---
 
+## Worked Example — Prompt → Pipeline Report → RCA → Exact Fix
+
+The pipeline is **prompt-driven**: you describe a requirement in plain English, point it at *your* repo, and the run pinpoints the exact failure — down to the file and line in your application code. Anyone can reuse this by swapping the repo URL and the requirement.
+
+### The prompt
+
+```
+Run agentic STLC on https://github.com/<owner>/<repo> for: <your plain-English requirement>,
+as a result give me the full pipeline report alongside the RCA, built from this run's actual
+artifacts. Since you have the application code access, give the line and file that needs to be fixed.
+```
+
+**Live example used below (Contoso Traders demo):**
+
+```
+Run agentic STLC on https://github.com/lambdapro/contosotraders-cloudtesting-copilot-HEx for:
+The application top banner should display a Memorial Day Sale banner., as a result give me the
+full pipeline report alongside the RCA, built from this run's actual artifacts. Since you have
+the application code access, give the line and file that needs to be fixed.
+```
+
+### What happens
+
+1. The requirement is written to the target repo and the **GitHub Actions pipeline is triggered**.
+2. **Kane AI (Stage 1)** verifies the requirement on a live browser and returns a compact verdict per acceptance criterion.
+3. **HyperExecute (Stage 5)** runs the generated Playwright regression across the browser matrix.
+4. Stages 6–9 build the **traceability matrix**, **release verdict**, and **RCA** from the run's artifacts.
+5. The orchestrator downloads those artifacts and renders the **Pipeline Report + RCA**, then — because it has read access to the application source — maps each failure to the **exact file and line** to change.
+
+### Sample output (rendered from the actual run's artifacts)
+
+> The block below is a real, abridged result for the Contoso example above. Yours will reflect your repo, requirement, and code.
+
+```text
+🧪 Agentic STLC — Pipeline Report
+Repo: lambdapro/contosotraders-cloudtesting-copilot-HEx  ·  Branch: feature/agentic-stlc-pipeline
+Requirement: The application top banner should display a Memorial Day Sale banner
+Run: #26968909061
+
+╭──────────────────────────────────────────────────╮
+│  RELEASE VERDICT:  🔴 RED                           │
+│  Functional (Kane):   2/7 passed (28.6%)           │
+│  Regression (HE):     0/7 executed (infra-blocked) │
+│  Combined pass rate:  0.0%  (both required)         │
+╰──────────────────────────────────────────────────╯
+
+Stage execution
+  Pre-flight  Bootstrap                ✅ 13s
+  1  Kane AI functional                ✅ 32s   7 ACs · 2 passed / 5 failed
+  2  Scenario sync                     ✅       SC-001…SC-007
+  3  Playwright generation             ✅       7 native TS specs
+  4  Test selection                    ✅       7 tests (full run)
+  5  HyperExecute                      ⚠️ 4m10s job 054269c5 · failed at connect()
+  6  Fetch results                     ✅       HE data_unavailable
+  7  Traceability + verdict            ✅       🔴 RED
+  -  RCA Failure Intelligence          ✅ 29s   Kane RCA + insights API
+
+Traceability matrix
+  Req     Acceptance criterion                   Kane   Regression  Overall
+  AC-001  Top banner = Memorial Day Sale         ❌     n/a         🔴
+  AC-002  Homepage nav (5 categories)            ✅     n/a         🟡
+  AC-003  Laptops category grid                  ❌     n/a         🔴
+  AC-004  Product detail page                    ❌     n/a         🔴
+  AC-005  Search returns results                 ✅     n/a         🟡
+  AC-006  Add to cart updates count              ❌     n/a         🔴
+  AC-007  Cart page lists items                  ❌     n/a         🔴
+
+🔍 Root Cause Analysis
+  AC-001 (the requirement) — APP DEFECT. The top orange strip renders placeholder
+         text "sei ffers", not "Memorial Day Sale" → exact-text assertion fails.
+  AC-003/004/006/007 — ONE shared APP DEFECT. /list/laptops and /list/all-products
+         stay on a loading spinner; the product grid never renders, so the
+         downstream actions can't proceed. One catalog-load fix clears all four.
+  HyperExecute — infra, not app. Cloud VMs could not bind a tunnel to the
+         runner-local app (documented limitation), so regression is data_unavailable.
+
+🛠️ Exact code fix (file + line)
+  File: src/ContosoTraders.Ui.Website/src/App.js  (line 74)
+
+  - <HeaderMessage type="warning" icon={warningIcon} message="sei ffers" />
+  + <HeaderMessage type="warning" icon={warningIcon} message="Memorial Day Sale" />
+
+  The top strip is rendered by the generic <HeaderMessage> component, which prints
+  its `message` prop verbatim. The placeholder "sei ffers" on line 74 is exactly
+  what Kane read off the banner; this one-line change makes AC-001 pass.
+```
+
+### How to read the printed pipeline
+
+| Part of the report | What it tells you | Where it comes from |
+|---|---|---|
+| **Release verdict banner** | GREEN / YELLOW / RED + combined pass rate | `reports/release_recommendation.json` |
+| **Stage execution** | Which of the 7 stages ran and how long | GitHub Actions job timings |
+| **Traceability matrix** | Every requirement → scenario → Kane result → regression result → overall | `reports/traceability_matrix.json` |
+| **Root Cause Analysis** | *Why* each requirement failed, grouped by shared root cause; app-defect vs. infra | Kane AI session summaries + `reports/kane_rca.json` (LambdaTest AI RCA API) |
+| **Exact code fix** | The file:line to change, with a diff | Cross-referencing the RCA against the application source the agent has read access to |
+
+The verdict is **dual-gated**: a requirement is only GREEN when **both** Kane (functional) and HyperExecute (regression) pass. The RCA separates **application defects** (which need a code fix) from **infrastructure issues** (which don't), so you never waste time "fixing" a test that failed for environmental reasons. The "Exact code fix" step is what turns a red build into an actionable, one-line pull request.
+
+---
+
+## Why Kane AI CLI Burns Far Fewer Tokens Than Driving Browsers with Claude / Cursor / Copilot
+
+A common alternative is to let a general coding agent (Claude Code, Cursor, GitHub Copilot) *drive the browser itself* — read the DOM, decide what to click, take a screenshot, assert, retry. That works, but **the browser's state lives inside the LLM's context window**, so token cost explodes with the number of tests, steps, retries, and page size.
+
+Agentic STLC instead delegates the live browser verification to the **Kane AI CLI**, a purpose-built functional-testing agent that runs *on LambdaTest's grid* — not in the orchestrator's token budget. The Claude orchestrator sends **one** instruction (the requirement) and ingests **one** compact structured result (status, one-line summary, session link). All of the per-step browser reasoning happens off-budget.
+
+### Where the tokens go
+
+| Cost driver | Coding agent drives the browser directly | Agentic STLC via Kane AI CLI |
+|---|---|---|
+| DOM / a11y snapshot per step | Streamed into the LLM context every step | **Never enters the LLM** — handled inside Kane |
+| Screenshots / vision tokens | Re-sent on most steps (vision is token-heavy) | **0** in the orchestrator |
+| Retries / self-heal loops | Re-feed full page state each retry | Handled inside Kane; orchestrator sees final result only |
+| Per-requirement orchestrator cost | Grows with steps × retries × DOM size | **~Constant** (one dispatch + one compact verdict) |
+| Scaling with N requirements | Roughly linear **and** with a large per-test constant | Linear with a **tiny** per-test constant |
+
+### Order-of-magnitude (illustrative, not a benchmark)
+
+Consider a single multi-step flow such as *"add a product to the cart and verify the count."* Driving it directly with a vision-capable agent typically means **~15–40 DOM/screenshot round-trips**, each adding **thousands to tens of thousands of tokens** to the context — easily **100K–500K+ tokens per test**, repeated on every retry and every run.
+
+With Kane AI CLI, the orchestrator's spend per requirement is essentially:
+
+```
+dispatch the requirement   ≈  1–2K tokens
+ingest the compact result  ≈  1–2K tokens
+---------------------------------------------
+total per requirement      ≈  ~3–4K tokens   (independent of step count, DOM size, retries)
+```
+
+The browser steps Kane performs — however many — **do not consume orchestrator tokens at all**. This is the same property the report-rendering step relies on: the final Pipeline Report and RCA are rendered from **compact JSON artifacts**, not from the model "watching" the run. That is why this pipeline holds an effectively **O(1) token cost per requirement** while a browser-driving coding agent scales as **O(steps × retries × page size)**.
+
+**Net effect:** for a suite of any meaningful size, routing functional verification through Kane AI CLI is typically **one to two orders of magnitude cheaper in tokens** than having Claude/Cursor/Copilot operate the browser directly — and it keeps the orchestrator's context small enough to remain fast and reliable across long runs.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
